@@ -5,7 +5,7 @@
 
 ### Summary
 
-In order to create movies with animations, you must first have a digital camera movie (.mp4) for your desired project and flight. You can download any .mp4 you would like from the EOL Data Archive. Once you have downloaded your digital camera movie from the EOL Data Archive, you are ready to proceeed. If you do not already have the Low Rate netCDF flight data file, you can also download it from the EOL Data Archive. Now that you have the digital camera movie and netCDF, you are ready to configure the script to create and combine the set of animated plots. Download the code from this GitHub repo: [https://github.com/NCAR/aircraft_movies_animations]
+In order to create movies with animations, you must first have a digital camera movie (.mp4) for your desired project and flight. If you have access to EOL servers, you can find processed movies available in /scr/raf/Prod_Data/<PROJECT>. If you do not already have the Low Rate netCDF flight data file, you can  download it from the EOL Data Archive or access under /scr/raf/Prod_Data/<PROJECT>. When you have the digital camera movie and netCDF, you are ready to configure the script to create and combine the set of animated plots. Download the code from this GitHub repo: [https://github.com/NCAR/aircraft_movies_animations]
 
 timeseries_animation.py is a program that reads variables from a config file animation_config.py and uses them to create a set of animated timeseries sub-plots that are time-aligned and combined with a .mp4 file. The list of variables 'Var1' to 'Var8' are used to select variables from a supplied netCDF file for the given flight.
 
