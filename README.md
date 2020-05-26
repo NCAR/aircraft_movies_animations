@@ -9,7 +9,7 @@ In order to create movies with animations, you must first create or download a d
 
 timeseries_animation.py is a program that reads variables from a config file animation_config.py and uses them to create a set of animated timeseries sub-plots that are time-aligned and combined with a .mp4 file. The list of variables 'Var1' to 'Var8' are used to select variables from a supplied netCDF file for the given flight.
 
-If you aren't sure which variables exist in the netCDF file that you have downloaded, you execute the following from a unix shell: ncdump -h file.nc | grep float. This will print a list of variables from the header of file.nc.
+If you aren't sure which variables exist in the netCDF file that you have downloaded, you execute the following from a unix shell: `ncdump -h file.nc | grep float`. This will print a list of variables from the header of file.nc.
 
 'Var1' to 'Var6' are plotted as time series while 'Var7' and 'Var8' are plotted as an animated scatter plot in the lower left of the frame. The plots are set to autoscale to the minimum and maximum value of the selected variable during the flight selected. 
 
