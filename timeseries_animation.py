@@ -64,6 +64,10 @@ class SubplotAnimation(animation.TimedAnimation):
         self.y1 = np.where(self.y1==-32767,np.nan,self.y1)
         self.y2 = np.asarray(anim_file[Var2])
         self.y2 = np.where(self.y2==-32767,np.nan,self.y2)
+        miny2 = np.nanmin(self.y2)
+        maxy2 = np.nanmax(self.y2)
+        print(miny2)
+        print(maxy2)
         self.y3 = np.asarray(anim_file[Var3])
         self.y3 = np.where(self.y3==-32767,np.nan,self.y3)
         self.y4 = np.asarray(anim_file[Var4])
@@ -88,6 +92,7 @@ class SubplotAnimation(animation.TimedAnimation):
         self.longitude = np.where(self.longitude==-32767,np.nan,self.longitude)
         self.latitude = np.where(self.latitude==-32767,np.nan,self.latitude)
 
+
         ax1.set_xlabel("Time [Hour]")
         ax1.set_ylabel(Var1+" ["+anim_file[Var1].units+"]")
         self.line1 = Line2D([], [], color=LineColor)
@@ -97,7 +102,7 @@ class SubplotAnimation(animation.TimedAnimation):
         ax1.add_line(self.line1a)
         ax1.add_line(self.line1e)
         ax1.set_xlim(min(self.x), max(self.x))
-        ax1.set_ylim(min(self.y1), max(self.y1))
+        ax1.set_ylim(np.nanmin(self.y1), np.nanmax(self.y1))
         ax1.xaxis.set_visible(False)
 
         ax2.set_xlabel("Time [Hour]")
@@ -109,7 +114,7 @@ class SubplotAnimation(animation.TimedAnimation):
         ax2.add_line(self.line2a)
         ax2.add_line(self.line2e)
         ax2.set_xlim(min(self.x), max(self.x))
-        ax2.set_ylim(min(self.y2), max(self.y2))
+        ax2.set_ylim(np.nanmin(self.y2), np.nanmax(self.y2))
         ax2.xaxis.set_visible(False)
         ax2.yaxis.set_label_position("right")
 
@@ -122,7 +127,7 @@ class SubplotAnimation(animation.TimedAnimation):
         ax3.add_line(self.line3a)
         ax3.add_line(self.line3e)
         ax3.set_xlim(min(self.x), max(self.x))
-        ax3.set_ylim(min(self.y3), max(self.y3))
+        ax3.set_ylim(np.nanmin(self.y3), np.nanmax(self.y3))
         ax3.xaxis.set_visible(False)
         
         ax4.set_xlabel("Time [Hour]")
@@ -134,7 +139,7 @@ class SubplotAnimation(animation.TimedAnimation):
         ax4.add_line(self.line4a)
         ax4.add_line(self.line4e)
         ax4.set_xlim(min(self.x), max(self.x))
-        ax4.set_ylim(min(self.y4), max(self.y4))
+        ax4.set_ylim(np.nanmin(self.y4), np.nanmax(self.y4))
         ax4.yaxis.set_label_position("right")
         ax4.xaxis.set_visible(False)
 
@@ -146,7 +151,7 @@ class SubplotAnimation(animation.TimedAnimation):
         ax5.add_line(self.line5a)
         ax5.add_line(self.line5e)
         ax5.set_xlim(min(self.x), max(self.x))
-        ax5.set_ylim(min(self.y5), max(self.y5))
+        ax5.set_ylim(np.nanmin(self.y5), np.nanmax(self.y5))
         
         ax6.set_ylabel(Var6+" ["+anim_file[Var6].units+"]")
         self.line6 = Line2D([], [], color=LineColor)
@@ -156,7 +161,7 @@ class SubplotAnimation(animation.TimedAnimation):
         ax6.add_line(self.line6a)
         ax6.add_line(self.line6e)
         ax6.set_xlim(min(self.x), max(self.x))
-        ax6.set_ylim(min(self.y6), max(self.y6))
+        ax6.set_ylim(np.nanmin(self.y6), np.nanmax(self.y6))
         ax6.yaxis.set_label_position("right")
  
         ax7.set_xlabel(Var7+" ["+anim_file[Var7].units+"]")
@@ -167,8 +172,8 @@ class SubplotAnimation(animation.TimedAnimation):
         ax7.add_line(self.line7)
         ax7.add_line(self.line7a)
         ax7.add_line(self.line7e)
-        ax7.set_xlim(min(anim_file[Var7]), max(anim_file[Var7]))
-        ax7.set_ylim(min(anim_file[Var8]), max(anim_file[Var8]))
+        ax7.set_xlim(np.nanmin(self.y7), np.nanmax(self.y7))
+        ax7.set_ylim(np.nanmin(self.y8), np.nanmax(self.y8))
 
         ax8.set_xlabel("GGLON ["+anim_file["GGLON"].units+"]")
         ax8.set_ylabel("GGLAT ["+anim_file["GGLAT"].units+"]")
