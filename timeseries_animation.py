@@ -76,8 +76,10 @@ class SubplotAnimation(animation.TimedAnimation):
         self.y5 = np.where(self.y5==-32767,np.nan,self.y5)
         self.y6 = np.asarray(anim_file[Var6])
         self.y6 = np.where(self.y6==-32767,np.nan,self.y6)
-        self.y7 = np.asarray(anim_file[Var7])
-        self.y7 = np.where(self.y7==-32767,np.nan,self.y7)
+        self.y7a = np.asarray(anim_file[Var7a])
+        self.y7a = np.where(self.y7a==-32767,np.nan,self.y7a)
+        self.y7b = np.asarray(anim_file[Var7b])
+        self.y7b = np.where(self.y7b==-32767,np.nan,self.y7b)
         self.y8 = np.asarray(anim_file[Var8])
         self.y8 = np.where(self.y8==-32767,np.nan,self.y8)
 
@@ -164,16 +166,23 @@ class SubplotAnimation(animation.TimedAnimation):
         ax6.set_ylim(np.nanmin(self.y6), np.nanmax(self.y6))
         ax6.yaxis.set_label_position("right")
  
-        ax7.set_xlabel(Var7+" ["+anim_file[Var7].units+"]")
+        ax7.set_xlabel(Var7a+" ["+anim_file[Var7a].units+"]")
         ax7.set_ylabel(Var8+" ["+anim_file[Var8].units+"]")
-        self.line7 = Line2D([], [], color=LineColor)
-        self.line7a = Line2D([], [], color="red", linewidth=1)
-        self.line7e = Line2D([], [], color="red", marker="o", markeredgecolor="r")
-        ax7.add_line(self.line7)
+        self.line7a = Line2D([], [], color=LineColor)
+        self.line7aa = Line2D([], [], color="red", linewidth=1)
+        self.line7ae = Line2D([], [], color="red", marker="o", markeredgecolor="r")
         ax7.add_line(self.line7a)
-        ax7.add_line(self.line7e)
-        ax7.set_xlim(np.nanmin(self.y7), np.nanmax(self.y7))
+        ax7.add_line(self.line7aa)
+        ax7.add_line(self.line7ae)
+        ax7.set_xlim(np.nanmin(self.y7a), np.nanmax(self.y7a))
         ax7.set_ylim(np.nanmin(self.y8), np.nanmax(self.y8))
+
+        self.line7b = Line2D([], [], color=LineColor2)
+        self.line7ba = Line2D([], [], color="red", linewidth=1)
+        self.line7be = Line2D([], [], color="red", marker="o", markeredgecolor="r")
+        ax7.add_line(self.line7b)
+        ax7.add_line(self.line7ba)
+        ax7.add_line(self.line7be)
 
         ax8.set_xlabel("GGLON ["+anim_file["GGLON"].units+"]")
         ax8.set_ylabel("GGLAT ["+anim_file["GGLAT"].units+"]")
@@ -224,9 +233,13 @@ class SubplotAnimation(animation.TimedAnimation):
         self.line6a.set_data(self.x[head_slice], self.y6[head_slice])
         self.line6e.set_data(self.x[head], self.y6[head])
         
-        self.line7.set_data(self.y7[:i], self.y8[:i])
-        self.line7a.set_data(self.y7[head_slice], self.y8[head_slice])
-        self.line7e.set_data(self.y7[head], self.y8[head])
+        self.line7a.set_data(self.y7a[:i], self.y8[:i])
+        self.line7aa.set_data(self.y7a[head_slice], self.y8[head_slice])
+        self.line7ae.set_data(self.y7a[head], self.y8[head])
+
+        self.line7b.set_data(self.y7b[:i], self.y8[:i])
+        self.line7ba.set_data(self.y7b[head_slice], self.y8[head_slice])
+        self.line7be.set_data(self.y7b[head], self.y8[head])
         
         self.line8.set_data(self.longitude[:i], self.latitude[:i])
         self.line8a.set_data(self.longitude[head_slice], self.latitude[head_slice])
@@ -238,7 +251,8 @@ class SubplotAnimation(animation.TimedAnimation):
                                self.line4, self.line4a, self.line4e,
                                self.line5, self.line5a, self.line5e,
                                self.line6, self.line6a, self.line6e,
-                               self.line7, self.line7a, self.line7e,
+                               self.line7a, self.line7aa, self.line7ae,
+                               self.line7b, self.line7ba, self.line7be,
                                self.line8, self.line8a, self.line8e]
     
     def new_frame_seq(self):
@@ -251,7 +265,8 @@ class SubplotAnimation(animation.TimedAnimation):
                  self.line4, self.line4a, self.line4e,
                  self.line5, self.line5a, self.line5e,
                  self.line6, self.line6a, self.line6e,
-                 self.line7, self.line7a, self.line7e,
+                 self.line7a, self.line7aa, self.line7ae,
+                 self.line7b, self.line7ba, self.line7be,
                  self.line8, self.line8a, self.line8e]
         for l in lines:
             l.set_data([], [])
