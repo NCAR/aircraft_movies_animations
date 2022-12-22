@@ -1,28 +1,28 @@
-#! /usr/bin/python
+#! /usr/bin/env python3
 
 #######################################################################
 # Configuration for timeseries_animation.py 
 #######################################################################
 
 # Provide project, flight, and location of data file
-project = "TI3GER"
+project = "SPICULE"
 flight = "rf01"
-dat = "/h/eol/taylort/aircraft_movies_animations/data_ti3ger/"
-flight_data = "/h/eol/taylort/aircraft_movies_animations/data_ti3ger/TI3GERrf01.nc"
+dat = "/h/eol/taylort/aircraft_movies_animations/data/"
+flight_data = "/h/eol/taylort/aircraft_movies_animations/data/SPICULErf01.nc"
 
 # Define where the existing digital camera movies are located
-flight_movie_dir = "/h/eol/taylort/aircraft_movies_animations/movies_ti3ger/"
+flight_movie_dir = "/h/eol/taylort/aircraft_movies_animations/movies/"
 
 # Define where you would like the output .mp4 to be written
 output_dir = "/h/eol/taylort/aircraft_movies_animations/"
 
 # Animation variable selection
 Var1 = "GGALT"
-Var2 = "CONCU_FBTM"
+Var2 = "ATX"
 Var3 = "PSX"
-Var4 = "WIC"
+Var4 = "ATX"
 Var5 = "ATX"
-Var6 = "CONCD_LWOO"
+Var6 = "ATX"
 Var7a = "ATX"
 Var7b = "DPXC"
 Var8 = "GGALT"
