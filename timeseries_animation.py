@@ -17,8 +17,9 @@ import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from matplotlib import animation as animation
 from animation_config import project, flight, dat, flight_data, flight_movie_dir, output_dir, Var1, Var2, Var3, Var4, Var5, Var6, Var7a, Var7b, Var8, dpi, fps, LineColor, LineColor2, width
-import netCDF4
-from netCDF4 import Dataset
+import xarray as xr
+#import netCDF4
+#from netCDF4 import Dataset
 import cftime
 #import nc_time_axis
 import os
@@ -27,7 +28,7 @@ import subprocess
 import logging
 
 # Read in the data file
-anim_file = Dataset(flight_data)
+anim_file = xr.open_dataset(flight_data)
 
 print('*******************************************')
 print('******   Starting flight animation   ******')
@@ -93,9 +94,9 @@ class SubplotAnimation(animation.TimedAnimation):
         self.y8 = np.where(self.y8 == -32767, np.nan, self.y8)
 
         TIME = anim_file.variables['Time']
-        convertedTime = netCDF4.num2date(TIME[:], TIME.units)
+        #convertedTime = netCDF4.num2date(TIME[:], TIME.units)
         self.t = np.asarray(anim_file['Time'])
-        self.x = np.asarray(convertedTime)
+        self.x = np.asarray(anim_file['Time'])
 
         self.longitude = np.asarray(anim_file['GGLON'])
         self.longitude = np.array(self.longitude, dtype=float)
@@ -212,10 +213,10 @@ class SubplotAnimation(animation.TimedAnimation):
         '''
         Draw the frame of the animation
         '''
-
+        one_second = np.timedelta64(1, 's')
         i = framedata
         head = i - 1
-        head_slice = (self.t > self.t[i] - 1.0) & (self.t < self.t[i])
+        head_slice = (self.t > self.t[i] - one_second) & (self.t < self.t[i])
         print('Drawing frame: ' + str(i))
 
         self.line1.set_data(self.x[:i], self.y1[:i])

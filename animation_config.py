@@ -5,16 +5,16 @@
 #######################################################################
 
 # Provide project, flight, and location of data file
-project = "SPICULE"
+project = "ACES"
 flight = "rf01"
-dat = "/h/eol/taylort/aircraft_movies_animations/data/"
-flight_data = "/h/eol/taylort/aircraft_movies_animations/data/SPICULErf01.nc"
+dat = f"/scr/raf_data/{project}"
+flight_data = f"{dat}/{project}{flight}.nc"
 
 # Define where the existing digital camera movies are located
-flight_movie_dir = "/h/eol/taylort/aircraft_movies_animations/movies/"
-
+flight_movie_dir = f"/scr/raf/Raw_Data/{project}/Movies/"
+flight_movie = "rf01.240408.160031_201559.mp4"
 # Define where you would like the output .mp4 to be written
-output_dir = "/h/eol/taylort/aircraft_movies_animations/"
+output_dir = "/h/eol/srunkel/aircraft_movies_animations/"
 
 # Animation variable selection
 Var1 = "GGALT"
