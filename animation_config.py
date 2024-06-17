@@ -5,6 +5,7 @@
 #######################################################################
 
 # Provide project, flight, and location of data file
+# Provide project, flight, and location of data file
 project = "ACES"
 flight = "rf01"
 dat = f"/scr/raf_data/{project}"
@@ -20,12 +21,16 @@ output_dir = "/h/eol/srunkel/aircraft_movies_animations/"
 Var1 = "GGALT"
 Var2 = "ATX"
 Var3 = "PSX"
-Var4 = "ATX"
-Var5 = "ATX"
-Var6 = "ATX"
+Var4 = "AT_A" ##vertical wind gusts
+Var5 = "WS"
+Var6 = "WD"
 Var7a = "ATX"
 Var7b = "DPXC"
 Var8 = "GGALT"
+LATS = [28, 34.5]
+LONS = [-111, -94] 
+
+VARLIST = [Var1, Var2, Var3, Var5, Var6, (Var8,Var7a, Var7b), ('GGLON', 'GGLAT')]
 
 # Plot formatting options
 dpi = 400 # Lower res will animate faster
