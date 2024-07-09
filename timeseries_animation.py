@@ -12,16 +12,12 @@
 # Author: TMT
 #######################################################################
 
+import math
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.lines import Line2D
 from matplotlib import animation as animation
-from animation_config import project, flight, dat, flight_data, flight_movie_dir, output_dir, VARLIST, LATS, LONS, dpi, fps, LineColor, LineColor2, width
+from animation_config_local import FLIGHT_TIME, project, flight, dat, flight_data, flight_movie_dir, output_dir, VARLIST, LATS, LONS, dpi, fps, LineColor, LineColor2, width,PointColor
 import xarray as xr
-#import netCDF4
-#from netCDF4 import Dataset
-import cftime
-#import nc_time_axis
 import os
 import fnmatch
 import subprocess
@@ -56,7 +52,7 @@ class SubplotAnimation(animation.TimedAnimation):
         plt.rcParams.update({'font.size': 12})
         plt.rc("xtick", labelsize=10)
         plt.rc("ytick", labelsize=10)
-        anim_file = xr.open_dataset(flight_data).sel(Time = slice('2024-04-08T16:00:31', '2024-04-08T20:15:59'))
+        anim_file = xr.open_dataset(flight_data).sel(Time = FLIGHT_TIME)
 
         ##add map for lat lon plots
 
@@ -64,9 +60,7 @@ class SubplotAnimation(animation.TimedAnimation):
                                                         '50m', edgecolor='black', facecolor='none')
 
         # Your latitude and longitude data
-        lat = anim_file['LAT'].values
-        lon = anim_file['LON'].values
-
+        sub_length = math.ceil(len(VARLIST) / 2)
         axes = []
         lines = []
         x = []
@@ -77,8 +71,8 @@ class SubplotAnimation(animation.TimedAnimation):
         ylabs = []
         points = []
         def create_subplot(fig, index):
-            if index == 7:  
-                ax = fig.add_subplot(4, 1, 4,projection=ccrs.PlateCarree())
+            if index == len(VARLIST):  
+                ax = fig.add_subplot(sub_length, 1, sub_length,projection=ccrs.PlateCarree())
                 
                 ax.coastlines('50m')
                 ax.add_feature(cf.OCEAN, facecolor='lightblue')
@@ -86,7 +80,7 @@ class SubplotAnimation(animation.TimedAnimation):
                 ax.add_feature(BORDERS2_10m, edgecolor='grey')
                 ax.set_extent([ LONS[0], LONS[1],LATS[0], LATS[1],])
             else:
-                ax = fig.add_subplot(4, 2, index)
+                ax = fig.add_subplot(sub_length, 2, index)
                 ax.grid(color='grey', linestyle='--', linewidth=0.5)
             
             return ax
@@ -95,6 +89,7 @@ class SubplotAnimation(animation.TimedAnimation):
             ax = create_subplot(fig, i)
             fig.tight_layout()
             axes.append(ax)
+            print(var)
             if isinstance(var, tuple):
                 x1 = anim_file[var[0]]
                 y1 = anim_file[var[1]]
@@ -103,12 +98,15 @@ class SubplotAnimation(animation.TimedAnimation):
                 miny = np.nanmin(y1)
                 maxy = np.nanmax(y1)
                 xlabel= var[0] + ' [' + anim_file[var[0]].units + ']'
-                line = ax.plot([], [], color=LineColor,linestyle='--')
-                point = ax.plot([], [], color="red", marker='o', markeredgecolor='r')
+                line = ax.plot([], [], color=LineColor)
+                point = ax.plot([], [], color=PointColor, marker='4', markeredgecolor='r')
                 if len(var)>2:
                     y2 = anim_file[var[2]]
-                    line2 = ax.plot([], [], color="red", linewidth=2) 
-                    point2 = ax.plot([], [], color="red", marker='o', markeredgecolor='r') 
+                    miny = np.nanmin(y1) if np.nanmin(y1) < np.nanmin(y2) else np.nanmin(y2) ##Make sure that the plot fits both lines
+                    maxy = np.nanmax(y1) if np.nanmax(y1) > np.nanmax(y2) else np.nanmax(y2) ##Make sure that the plot fits both lines
+                    line2 = ax.plot([], [], color=LineColor2, linewidth=2) 
+                    point = ax.plot([], [], color=PointColor, marker='o', markeredgecolor='r')
+                    point2 = ax.plot([], [], color=PointColor, marker='o', markeredgecolor='r') 
                     ylabel=var[1] + ' '+var[2] +' [' + anim_file[var[1]].units + ']'
                     y.append((y1,y2)) 
                     lines.append([line, line2])
@@ -128,10 +126,11 @@ class SubplotAnimation(animation.TimedAnimation):
                 
                 xlims.append([minx, maxx])
                 ylims.append([miny, maxy])
-                if i <5:
+                if i <(sub_length+1):
                     ax.xaxis.set_tick_params(labelbottom=False)
             else:
                 y1 = anim_file[var]
+                print(y1)
                 time = pd.to_datetime(y1.Time.values)
                 miny = np.nanmin(y1)
                 maxy = np.nanmax(y1)
@@ -140,7 +139,7 @@ class SubplotAnimation(animation.TimedAnimation):
                 xlabel= 'Time [Hour]' 
                 ylabel= var + ' [' + anim_file[var].units + ']'
                 line = ax.plot([], [], color=LineColor)
-                point = ax.plot([], [], color="red", marker='o', markeredgecolor='r')
+                point = ax.plot([], [], color=PointColor, marker='o', markeredgecolor='r')
                 lines.append([line])
                 points.append([point])
                 x.append(time)
@@ -149,7 +148,7 @@ class SubplotAnimation(animation.TimedAnimation):
                 xlabs.append(xlabel) 
                 xlims.append([minx, maxx])
                 ylims.append([miny, maxy])
-                if i <5:
+                if i <len(VARLIST)-1:
                     ax.xaxis.set_tick_params(labelbottom=False)
                 ax.set_xlim([minx, maxx])
                 ax.set_ylim([miny, maxy])
@@ -158,17 +157,12 @@ class SubplotAnimation(animation.TimedAnimation):
             plt.setp(ax.xaxis.get_majorticklabels(), rotation=25)
         def animate(i):
             print(f'Animating frame {i}')
-            #count = 0
-            for line, point, ax, xlim,ylim, x1,y1 in zip(lines,points, axes, xlims,ylims,x, y):
+            for line, point, x1,y1 in zip(lines,points,x, y):
                 for l in range(len(line)):
                     line[l][0].set_data(x1[:i], y1[l][:i])
                     point[l][0].set_data(x1[i], y1[l][i])
-
-
-                
-        #fig.subplots_adjust(bottom=0.1)
         
-        anim = animation.FuncAnimation(fig, animate, frames =  len(x[0]), blit = False) #,
+        anim = animation.FuncAnimation(fig, animate, frames = len(x[0]) , blit = False) #,
         anim.save(save_file, fps=fps, dpi=dpi)
         print('Saving ' + save_file)
 # Define function to check to make sure supplied vars are in the .nc file
@@ -231,7 +225,7 @@ def main():
     dir_check(output_dir)
 
     for file in os.listdir(flight_movie_dir):
-        if fnmatch.fnmatch(file, '*' + flight + '*'):
+        if fnmatch.fnmatch(file, '*' + flight + '*.mp4'):
             global flight_movie
             flight_movie = file
 
