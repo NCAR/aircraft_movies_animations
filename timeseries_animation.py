@@ -16,7 +16,7 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import animation as animation
-from animation_config_local import project, flights, dat, flight_data, flight_movie_dir, output_dir, VARLIST, dpi, fps, LineColor, LineColor2, width,PointColor
+from animation_config import project, flights, dat, flight_movie_dir, output_dir, VARLIST, dpi, fps, LineColor, LineColor2, width,PointColor
 import xarray as xr
 import os
 import fnmatch
@@ -31,14 +31,6 @@ import re
 
 BORDERS2_10m = cf.NaturalEarthFeature('cultural', 'admin_1_states_provinces',
                                                 '50m', edgecolor='black', facecolor='none')
-
-# Read in the data file
-anim_file = xr.open_dataset(flight_data)
-save_file = project + flight + 'animation.mp4'
-print('*******************************************')
-print('******   Starting flight animation   ******')
-print('*******************************************')
-print('Using flight data file: ' + flight_data)
 
 
 class SubplotAnimation(animation.TimedAnimation):
@@ -107,7 +99,6 @@ class SubplotAnimation(animation.TimedAnimation):
                     miny = np.nanmin(y1) if np.nanmin(y1) < np.nanmin(y2) else np.nanmin(y2) ##Make sure that the plot fits both lines
                     maxy = np.nanmax(y1) if np.nanmax(y1) > np.nanmax(y2) else np.nanmax(y2) ##Make sure that the plot fits both lines
                     line2 = ax.plot([], [], color=LineColor2, linewidth=2, label=var[2]) 
-                    
                     point2 = ax.plot([], [], color=PointColor, marker='o', markeredgecolor='r') 
                     ylabel=var[1] + ' '+var[2] +' [' + anim_file[var[1]].units + ']'
                     y.append((y1,y2)) 
@@ -117,7 +108,7 @@ class SubplotAnimation(animation.TimedAnimation):
                     ax.set_ylim([miny, maxy])
                     ax.set_xlabel(xlabel)
                     ax.set_ylabel(ylabel)
-                    ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.05), ncol=2) 
+                    ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.1), ncol=2) 
                 else:
                     ylabel=var[1] + ' [' + anim_file[var[1]].units + ']'
                     y.append([y1]) 
@@ -181,7 +172,11 @@ def dir_check(directory):
             exit(1)
 
 
-def process_animation():
+def process_animation(flight):
+    print('*******************************************')
+    print('******   Starting flight animation   ******')
+    print('*******************************************')
+    print('Using flight data file: ' + flight_data)
 
     ani = SubplotAnimation()
     
@@ -234,11 +229,11 @@ def get_flight_time():
     end_time = datetime.strptime(end_time_str, '%a %b %d %H:%M:%S %Y')
 
     # Format the times as a slice
-    time_slice = f"slice('{start_time.isoformat()}', '{end_time.isoformat()}')"
+    time_slice = slice(start_time, end_time)
     return time_slice
 
 def get_flight_area():
-    result = subprocess.run(['flt_area', 'flight_data'], capture_output=True)
+    result = subprocess.run(['flt_area', flight_data], capture_output=True)
     # Decode the output
     output = result.stdout.decode()
     # Extract the latitudes and longitudes
@@ -247,7 +242,7 @@ def get_flight_area():
     min_lon = float(re.search(r'Minimum Longitude: (.*)', output).group(1))
     max_lon = float(re.search(r'Maximum Longitude: (.*)', output).group(1))
 
-    return (math.ceil(min_lat), math.ceil(max_lat)), (math.ceil(min_lon), math.ceil(max_lon))
+    return (math.floor(min_lat), math.ceil(max_lat)), (math.floor(min_lon), math.ceil(max_lon))
 
 def setup_flight_vars(flight):
     ##Setup the global variables for plotting and animation for each flight
@@ -256,7 +251,11 @@ def setup_flight_vars(flight):
     global lats
     global lons
     global flight_data
+    global anim_file
+    global save_file
     flight_data = f"{dat}/{project}{flight}.nc"
+    anim_file = xr.open_dataset(flight_data)
+    save_file = project + flight + 'animation.mp4'
     for file in os.listdir(flight_movie_dir):
         if fnmatch.fnmatch(file, '*' + flight + '*.mp4'):
             flight_time = get_flight_time()
@@ -277,7 +276,7 @@ def main():
     # Read in the movie file created from CombineCameras.pl
         if os.path.exists(flight_movie_dir + flight_movie):
 
-            process_animation()
+            process_animation(flight)
 
         # If the movie file doesn't exist, then see if the user wants to make it.
         else:
