@@ -6,10 +6,10 @@
 
 # Provide project, flight, and location of data file
 # Provide project, flight, and location of data file
-project = "ACES"
-flight = "rf01"
+project = "CAESAR"
+flights = ["rf04","rf06","rf09","rf10","tf06"] ##must be a list even if only processing one flight
 dat = f"/scr/raf_data/{project}"
-flight_data = f"{dat}/{project}{flight}.nc"
+#flight_data = f"{dat}/{project}{flight}.nc"
 
 # Define where the existing digital camera movies are located
 flight_movie_dir = f"/scr/raf/Raw_Data/{project}/Movies/"
@@ -27,10 +27,7 @@ Var6 = "WDC"
 Var7a = "ATX"
 Var7b = "DPXC"
 
-## Flight region from flt_area -- will be automated
-LATS = [28, 34.5] 
-LONS = [-111, -94] 
-FLIGHT_TIME = slice('2024-03-11T06:54:02', '2024-03-11T12:50:11')  ##Flight time output from flt_time -- will be automated
+#FLIGHT_TIME = slice('2024-03-11T06:54:02', '2024-03-11T12:50:11')  ##Flight time output from flt_time -- will be automated
 
 VARLIST = [Var1, Var2, Var3, Var5, Var6, (Var1,Var7a, Var7b), ('GGLON', 'GGLAT')]
 
