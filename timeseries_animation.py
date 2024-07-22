@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#! /Users/srunkel/anaconda3/envs/animation/bin/python  
 
 ########################################################################
 # Script to create animations of selected variables from a given
@@ -16,7 +16,7 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import animation as animation
-from animation_config import project, flights, dat, flight_movie_dir, output_dir, VARLIST, dpi, fps, LineColor, LineColor2, width,PointColor
+from animation_config_local import project, flights, dat, flight_movie_dir, output_dir, VARLIST, dpi, fps, LineColor, LineColor2, width,PointColor
 import xarray as xr
 import os
 import fnmatch
@@ -27,6 +27,12 @@ import cartopy.feature as cf
 import cartopy.crs as ccrs
 from datetime import datetime
 import re
+from matplotlib.dates import DateFormatter
+
+# Your existing code here...
+
+# Inside your plotting function, after setting the x-axis limits:
+
 
 
 BORDERS2_10m = cf.NaturalEarthFeature('cultural', 'admin_1_states_provinces',
@@ -76,7 +82,7 @@ class SubplotAnimation(animation.TimedAnimation):
             else:
                 ax = fig.add_subplot(sub_length, 2, index)
                 ax.grid(color='grey', linestyle='--', linewidth=0.5)
-            
+                ax.xaxis.set_major_formatter(DateFormatter('%H%M'))
             return ax
         for i, var in enumerate(VARLIST, start=1):
             #rotation = 25 if i in [5, 6] else None
@@ -108,7 +114,7 @@ class SubplotAnimation(animation.TimedAnimation):
                     ax.set_ylim([miny, maxy])
                     ax.set_xlabel(xlabel)
                     ax.set_ylabel(ylabel)
-                    ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.1), ncol=2) 
+                    ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.2), ncol=2) 
                 else:
                     ylabel=var[1] + ' [' + anim_file[var[1]].units + ']'
                     y.append([y1]) 
@@ -142,7 +148,7 @@ class SubplotAnimation(animation.TimedAnimation):
                 xlabs.append(xlabel) 
                 xlims.append([minx, maxx])
                 ylims.append([miny, maxy])
-                if i <len(VARLIST)-1:
+                if i <len(VARLIST)-2:
                     ax.xaxis.set_tick_params(labelbottom=False)
                 ax.set_xlim([minx, maxx])
                 ax.set_ylim([miny, maxy])
@@ -156,7 +162,7 @@ class SubplotAnimation(animation.TimedAnimation):
                     line[l][0].set_data(x1[:i], y1[l][:i])
                     point[l][0].set_data(x1[i], y1[l][i])
         
-        anim = animation.FuncAnimation(fig, animate, frames = len(x[0]) , blit = False) #,
+        anim = animation.FuncAnimation(fig, animate, frames=len(x[0]), blit = False) #,
         anim.save(save_file, fps=fps, dpi=dpi)
         print('Saving ' + save_file)
 # Define function to check to make sure supplied vars are in the .nc file
@@ -214,35 +220,41 @@ def process_animation(flight):
     command = 'rm final_' + save_file
     os.system(command)
 
-def get_flight_time():
-    '''
-    Function to get the takeoff and landing time for the flight to select the xarray
-    '''
-    result = subprocess.run(['flt_time', flight_data], capture_output=True)
-    output = result.stdout.decode('utf-8')
-    # Extract the start and end times
-    start_time_str = re.search(r'Takeoff: (.*)', output).group(1)
-    end_time_str = re.search(r'Landing: (.*)', output).group(1)
 
-    # Parse the times
-    start_time = datetime.strptime(start_time_str, '%a %b %d %H:%M:%S %Y')
-    end_time = datetime.strptime(end_time_str, '%a %b %d %H:%M:%S %Y')
 
+def get_flight_area(dataset):
+        # Assuming 'dataset' is an xarray Dataset with the required attributes
+    max_lat = dataset.attrs['geospatial_lat_max']
+    min_lat = dataset.attrs['geospatial_lat_min']
+    max_lon = dataset.attrs['geospatial_lon_max']
+    min_lon = dataset.attrs['geospatial_lon_min']
+
+    # Return the latitude and longitude bounds
+    return (math.floor(min_lat), math.ceil(max_lat)), (math.floor(min_lon), math.ceil(max_lon))
+
+def create_time_slice(filename):
+    # Parse the start time
+    filename = filename.rsplit('.mp4', 1)[0]
+    time_part = ''.join(filename.split('.', 1)[1:]) # This assumes the format is always as described
+    
+    # Step 2: Split the time part into start and end times
+    start_time_str, end_time_str = time_part.split('_')
+    start_time = datetime.strptime(start_time_str, '%y%m%d.%H%M%S')
+    
+    # Extract the date part from the start time
+    start_date_str = start_time.strftime('%y%m%d')
+    
+    # Combine the start date with the end time's time part
+    # Assuming end_time_str format is '%H:%M:%S' and needs to be combined with the start date
+    end_time_full_str = f"{start_date_str}.{end_time_str}"
+    
+    # Parse the modified end time string
+    end_time = datetime.strptime(end_time_full_str, '%y%m%d.%H%M%S')
+    
     # Format the times as a slice
     time_slice = slice(start_time, end_time)
+    
     return time_slice
-
-def get_flight_area():
-    result = subprocess.run(['flt_area', flight_data], capture_output=True)
-    # Decode the output
-    output = result.stdout.decode()
-    # Extract the latitudes and longitudes
-    max_lat = float(re.search(r'Maximum Latitude: (.*)', output).group(1))
-    min_lat = float(re.search(r'Minimum Latitude: (.*)', output).group(1))
-    min_lon = float(re.search(r'Minimum Longitude: (.*)', output).group(1))
-    max_lon = float(re.search(r'Maximum Longitude: (.*)', output).group(1))
-
-    return (math.floor(min_lat), math.ceil(max_lat)), (math.floor(min_lon), math.ceil(max_lon))
 
 def setup_flight_vars(flight):
     ##Setup the global variables for plotting and animation for each flight
@@ -258,9 +270,9 @@ def setup_flight_vars(flight):
     save_file = project + flight + 'animation.mp4'
     for file in os.listdir(flight_movie_dir):
         if fnmatch.fnmatch(file, '*' + flight + '*.mp4'):
-            flight_time = get_flight_time()
             flight_movie = file
-            lats,lons = get_flight_area()
+            lats,lons = get_flight_area(anim_file)
+            flight_time=create_time_slice(file)
         else:
             pass
 
