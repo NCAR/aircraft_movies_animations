@@ -16,7 +16,7 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import animation as animation
-from animation_config_local import project, flights, dat, flight_movie_dir, output_dir, VARLIST, dpi, fps, LineColor, LineColor2, width,PointColor
+from animation_config import project, flights, dat, flight_movie_dir, output_dir, VARLIST, dpi, fps, LineColor, LineColor2, width,PointColor
 import xarray as xr
 import os
 import fnmatch
