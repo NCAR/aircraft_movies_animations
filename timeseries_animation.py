@@ -206,13 +206,18 @@ def dir_check(directory):
             exit(1)
 
 
-def process_animation(flight):
+def process_animation(flight, render=True):
     print('*******************************************')
     print('******   Starting flight animation   ******')
     print('*******************************************')
     print('Using flight data file: ' + flight_data)
 
-    ani = SubplotAnimation()
+    if render:
+        ani = SubplotAnimation()
+    elif not os.path.exists(save_file):
+        print('Cannot combine: ' + save_file + ' does not exist. '
+              'Run without --combine-only first to create the frames.')
+        return
     
 
     # Use ffmpeg to align the duration based on number of frames and frame rates
@@ -293,7 +298,12 @@ def setup_flight_vars(flight):
     global flight_data
     global anim_file
     global save_file
-    flight_data = f"{dat}/{project}{flight}.nc"
+
+    # The TI3GER-2 data files drop the dash in their names (e.g. TI3GER2rf01.nc)
+    # even though the project directory keeps it.
+    file_project = project.replace('-', '') if project == 'TI3GER-2' else project
+    flight_data = f"{dat}/{file_project}{flight}.nc"
+
     anim_file = xr.open_dataset(flight_data)
     save_file = project + flight + 'animation.mp4'
     for file in os.listdir(flight_movie_dir):
@@ -311,6 +321,11 @@ def main():
     parser.add_argument('--preview', action='store_true',
                         help='Render only the first frame of each flight to a '
                              'PNG and skip the mp4 encode, to check the layout.')
+    parser.add_argument('--combine-only', action='store_true',
+                        help='Skip frame rendering and reuse the existing '
+                             'animation mp4, only running the ffmpeg combine '
+                             'steps. Use to rerun ffmpeg without recreating '
+                             'frames.')
     args = parser.parse_args()
 
     # Perform checks to see if dirs are already present, make them if not
@@ -328,7 +343,7 @@ def main():
     # Read in the movie file created from CombineCameras.pl
         if os.path.exists(flight_movie_dir + flight_movie):
 
-            process_animation(flight)
+            process_animation(flight, render=not args.combine_only)
 
         # If the movie file doesn't exist, then see if the user wants to make it.
         else:
