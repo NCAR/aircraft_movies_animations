@@ -3,11 +3,18 @@
 ![Frame](https://github.com/tthomas88/timeseries_animation/blob/master/wecanexample.png)
 
 
-### Summary
+## Required packages
+```
+dnf install python3
+dnf install ffmpeg
+dnf install ffprobe
+pip install numpy matplotlib xarray pandas cartopy
+```
+## Summary
 
 In order to create movies with animations, you must first create or download a digital camera movie (.mp4) for your desired project and flight. If you have access to EOL servers, you can find processed movies available in `/scr/raf/Raw_Data/<PROJECT>`. If you do not already have the Low Rate netCDF flight data file, you can  download it from the EOL Data Archive or access under `/scr/raf/Prod_Data/<PROJECT>/LRT`. When you have the digital camera movie and netCDF, you are ready to configure the script to create and combine the set of animated plots. Download the code from this GitHub repo: [https://github.com/NCAR/aircraft_movies_animations]
 
-timeseries_animation.py is a program that reads variables from a config file animation_config.py and uses them to create a set of animated timeseries sub-plots that are time-aligned and combined with a .mp4 file. The list of variables 'Var1' to 'Var8' are used to select variables from a supplied netCDF file for the given flight.
+`timeseries_animation.py` is a program that reads variables from a config file `animation_config.py` and uses them to create a set of animated timeseries sub-plots that are time-aligned and combined with a .mp4 file. The list of variables 'Var1' to 'Var8' are used to select variables from a supplied netCDF file for the given flight.
 
 If you aren't sure which variables exist in the netCDF file that you have downloaded, you execute the following from a unix shell: `ncdump -h file.nc | grep float`. This will print a list of variables from the header of file.nc.
 
@@ -15,6 +22,6 @@ If you aren't sure which variables exist in the netCDF file that you have downlo
 
 The y-axis of each plot is labeled with the variable name and the units from the netCDF variable attribute 'units'. The line color in the timeseries animation can also be defined based on the input in the parameter file.
 
-Once the animation is created, the program calls FFmpeg to set the duration and frame count using a corresponding digital camera movie located in the user defined 'flight_movie_dir'. Once the animation .mp4 and the digital camera movie .mp4 files have identical duration, the FFmpeg utility is called to combine the two .mp4 files into a single .mp4 file that has the camera images displayed the left and the timeseries animation displayed on the right, with time synchronized variables displayed as the aircraft images are updated.
+Once the animation is created, the program calls FFmpeg to set the duration and frame count using a corresponding digital camera movie located in the user defined `flight_movie_dir`. Once the animation .mp4 and the digital camera movie .mp4 files have identical duration, the FFmpeg utility is called to combine the two .mp4 files into a single .mp4 file that has the camera images displayed the left and the timeseries animation displayed on the right, with time synchronized variables displayed as the aircraft images are updated.
 
 The variables in the parameter file will need to be updated to reflect your project, flight, paths, and variables.
