@@ -18,6 +18,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import animation as animation
 from animation_config import project, flights, dat, flight_movie_dir, output_dir, VARLIST, dpi, fps, LineColor, LineColor2, width, PointColor
+from layout import subplot_rows, classify_entry, subplot_position
 import xarray as xr
 import os
 import fnmatch
@@ -51,7 +52,7 @@ class SubplotAnimation(animation.TimedAnimation):
                                               '50m', edgecolor='black', facecolor='none')
 
         # Your latitude and longitude data
-        sub_length = math.ceil(len(VARLIST) / 2)
+        sub_length = subplot_rows(len(VARLIST))
         axes = []
         lines = []
         x = []
@@ -62,11 +63,13 @@ class SubplotAnimation(animation.TimedAnimation):
         ylabs = []
         points = []
         def create_subplot(fig, index, var):
-            if index == len(VARLIST):
+            kind = classify_entry(index, len(VARLIST), var)
+            nrows, ncols, pos = subplot_position(index, len(VARLIST))
+            if kind == 'map':
                 # The last entry is always the lat/lon map: place it in the
                 # bottom-right quadrant and let it fill the cell (the default
                 # 'equal' aspect shrinks it to a narrow box).
-                ax = fig.add_subplot(sub_length, 2, 2 * sub_length,
+                ax = fig.add_subplot(nrows, ncols, pos,
                                      projection=ccrs.PlateCarree())
 
                 ax.coastlines('50m')
@@ -83,15 +86,15 @@ class SubplotAnimation(animation.TimedAnimation):
                 gl.right_labels = False
                 gl.xlabel_style = {'size': 8}
                 gl.ylabel_style = {'size': 8}
-            elif isinstance(var, tuple):
+            elif kind == 'pair':
                 # A parenthesised entry plots one variable against another
                 # (e.g. GGALT vs ATX/DPXC), so its x-axis is not time and gets
                 # no DateFormatter. May appear anywhere in VARLIST.
-                ax = fig.add_subplot(sub_length, 2, index)
+                ax = fig.add_subplot(nrows, ncols, pos)
                 ax.grid(color='grey', linestyle='--', linewidth=0.5)
             else:
                 # A plain variable is plotted against time.
-                ax = fig.add_subplot(sub_length, 2, index)
+                ax = fig.add_subplot(nrows, ncols, pos)
                 ax.grid(color='grey', linestyle='--', linewidth=0.5)
                 ax.xaxis.set_major_formatter(DateFormatter('%H%M'))
             return ax
@@ -218,7 +221,6 @@ def process_animation(flight, render=True):
         print('Cannot combine: ' + save_file + ' does not exist. '
               'Run without --combine-only first to create the frames.')
         return
-    
 
     # Use ffmpeg to align the duration based on number of frames and frame rates
     # This will get the duration of the flight movie file and store as a variable

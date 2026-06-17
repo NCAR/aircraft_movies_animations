@@ -25,3 +25,20 @@ The y-axis of each plot is labeled with the variable name and the units from the
 Once the animation is created, the program calls FFmpeg to set the duration and frame count using a corresponding digital camera movie located in the user defined `flight_movie_dir`. Once the animation .mp4 and the digital camera movie .mp4 files have identical duration, the FFmpeg utility is called to combine the two .mp4 files into a single .mp4 file that has the camera images displayed the left and the timeseries animation displayed on the right, with time synchronized variables displayed as the aircraft images are updated.
 
 The variables in the parameter file will need to be updated to reflect your project, flight, paths, and variables.
+
+## Running tests
+
+Unit tests for the subplot layout logic live in `test_layout.py` and use only
+the Python standard library (`unittest`) plus `layout.py`, so they run without
+matplotlib, cartopy, or any data files. They verify that both supported
+`VARLIST` styles (two variables on one plot, and two variables plotted against
+each other) map onto the subplot grid correctly.
+
+Run them from the repo root with:
+```
+python3 -m unittest test_layout
+```
+Add `-v` for per-test output:
+```
+python3 -m unittest test_layout -v
+```
