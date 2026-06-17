@@ -1,4 +1,4 @@
-#! /Users/srunkel/anaconda3/envs/animation/bin/python  
+#! /usr/bin/env python3
 
 ########################################################################
 # Script to create animations of selected variables from a given
@@ -7,7 +7,7 @@
 # Separate .mp4 files are combined using ffmpeg to create final data
 # Product with movie and animation.
 #
-# Copyright (2022) University Corporation for Atmospheric Research
+# Copyright (2026) University Corporation for Atmospheric Research
 #
 # Author: TMT
 #######################################################################
@@ -16,7 +16,7 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import animation as animation
-from animation_config import project, flights, dat, flight_movie_dir, output_dir, VARLIST, dpi, fps, LineColor, LineColor2, width,PointColor
+from animation_config import project, flights, dat, flight_movie_dir, output_dir, VARLIST, dpi, fps, LineColor, LineColor2, width, PointColor
 import xarray as xr
 import os
 import fnmatch
@@ -28,16 +28,6 @@ import cartopy.crs as ccrs
 from datetime import datetime
 import re
 from matplotlib.dates import DateFormatter
-
-# Your existing code here...
-
-# Inside your plotting function, after setting the x-axis limits:
-
-
-
-BORDERS2_10m = cf.NaturalEarthFeature('cultural', 'admin_1_states_provinces',
-                                                '50m', edgecolor='black', facecolor='none')
-
 
 class SubplotAnimation(animation.TimedAnimation):
     '''
@@ -57,7 +47,7 @@ class SubplotAnimation(animation.TimedAnimation):
         ##add map for lat lon plots
 
         BORDERS2_10m = cf.NaturalEarthFeature('cultural', 'admin_1_states_provinces',
-                                                        '50m', edgecolor='black', facecolor='none')
+                                              '50m', edgecolor='black', facecolor='none')
 
         # Your latitude and longitude data
         sub_length = math.ceil(len(VARLIST) / 2)
@@ -72,13 +62,13 @@ class SubplotAnimation(animation.TimedAnimation):
         points = []
         def create_subplot(fig, index):
             if index == len(VARLIST):  
-                ax = fig.add_subplot(sub_length, 1, sub_length,projection=ccrs.PlateCarree())
+                ax = fig.add_subplot(sub_length, 1, sub_length, projection=ccrs.PlateCarree())
                 
                 ax.coastlines('50m')
                 ax.add_feature(cf.OCEAN, facecolor='lightblue')
                 ax.add_feature(cf.LAND, facecolor='beige')
                 ax.add_feature(BORDERS2_10m, edgecolor='grey')
-                ax.set_extent([lons[0], lons[1],lats[0], lats[1],])
+                ax.set_extent([lons[0], lons[1], lats[0], lats[1]])
             else:
                 ax = fig.add_subplot(sub_length, 2, index)
                 ax.grid(color='grey', linestyle='--', linewidth=0.5)
@@ -102,12 +92,13 @@ class SubplotAnimation(animation.TimedAnimation):
                 line = ax.plot([], [], color=LineColor, label = var[1])
                 if len(var)>2:
                     y2 = anim_file[var[2]]
-                    miny = np.nanmin(y1) if np.nanmin(y1) < np.nanmin(y2) else np.nanmin(y2) ##Make sure that the plot fits both lines
-                    maxy = np.nanmax(y1) if np.nanmax(y1) > np.nanmax(y2) else np.nanmax(y2) ##Make sure that the plot fits both lines
+                    # Make sure that the plot fits both lines
+                    miny = np.nanmin(y1) if np.nanmin(y1) < np.nanmin(y2) else np.nanmin(y2)
+                    maxy = np.nanmax(y1) if np.nanmax(y1) > np.nanmax(y2) else np.nanmax(y2)
                     line2 = ax.plot([], [], color=LineColor2, linewidth=2, label=var[2]) 
                     point2 = ax.plot([], [], color=PointColor, marker='o', markeredgecolor='r') 
                     ylabel=var[1] + ' '+var[2] +' [' + anim_file[var[1]].units + ']'
-                    y.append((y1,y2)) 
+                    y.append((y1, y2)) 
                     lines.append([line, line2])
                     points.append([point, point2])
                     ax.set_xlim([minx, maxx])
@@ -157,7 +148,7 @@ class SubplotAnimation(animation.TimedAnimation):
             plt.setp(ax.xaxis.get_majorticklabels(), rotation=25)
         def animate(i):
             print(f'Animating frame {i}')
-            for line, point, x1,y1 in zip(lines,points,x, y):
+            for line, point, x1, y1 in zip(lines, points, x, y):
                 for l in range(len(line)):
                     line[l][0].set_data(x1[:i], y1[l][:i])
                     point[l][0].set_data([x1[i]], [y1[l][i]])
@@ -211,7 +202,7 @@ def process_animation(flight):
     command = 'ffmpeg -i mid_' + save_file + ' -s ' + dims + ' -c:a copy final_' + save_file
     os.system(command)
 
-    command = 'ffmpeg -i ' + flight_movie_dir + flight_movie + ' -i final_' + save_file + ' -filter_complex hstack,format=yuv420p -c:v libx264 -crf 18 ' + output_dir + project + flight + '.mp4'
+    command = 'ffmpeg -i ' + flight_movie_dir + flight_movie + ' -i final_' + save_file + ' -filter_complex hstack, format=yuv420p -c:v libx264 -crf 18 ' + output_dir + project + flight + '.mp4'
     os.system(command)
 
     command = 'rm mid_' + save_file
@@ -271,7 +262,7 @@ def setup_flight_vars(flight):
     for file in os.listdir(flight_movie_dir):
         if fnmatch.fnmatch(file, '*' + flight + '*.mp4'):
             flight_movie = file
-            lats,lons = get_flight_area(anim_file)
+            lats, lons = get_flight_area(anim_file)
             flight_time=create_time_slice(file)
         else:
             pass
