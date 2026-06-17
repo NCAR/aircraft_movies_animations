@@ -239,7 +239,7 @@ def process_animation(flight):
     command = 'ffmpeg -i mid_' + save_file + ' -s ' + dims + ' -c:a copy final_' + save_file
     os.system(command)
 
-    command = 'ffmpeg -i ' + flight_movie_dir + flight_movie + ' -i final_' + save_file + ' -filter_complex hstack, format=yuv420p -c:v libx264 -crf 18 ' + output_dir + project + flight + '.mp4'
+    command = 'ffmpeg -i ' + flight_movie_dir + flight_movie + ' -i final_' + save_file + ' -filter_complex hstack,format=yuv420p -c:v libx264 -crf 18 ' + output_dir + project + flight + '.mp4'
     os.system(command)
 
     command = 'rm mid_' + save_file
