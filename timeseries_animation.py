@@ -12,6 +12,7 @@
 # Author: TMT
 #######################################################################
 
+import argparse
 import math
 import numpy as np
 import matplotlib.pyplot as plt
@@ -35,7 +36,7 @@ class SubplotAnimation(animation.TimedAnimation):
     Reads the variables listed in the configuration setup
     '''
 
-    def __init__(self):
+    def __init__(self, preview=False):
 
         print('Creating figure subplots')
         fig = plt.figure(figsize=(8, 10))
@@ -60,23 +61,43 @@ class SubplotAnimation(animation.TimedAnimation):
         xlabs = []
         ylabs = []
         points = []
-        def create_subplot(fig, index):
-            if index == len(VARLIST):  
-                ax = fig.add_subplot(sub_length, 1, sub_length, projection=ccrs.PlateCarree())
-                
+        def create_subplot(fig, index, var):
+            if index == len(VARLIST):
+                # The last entry is always the lat/lon map: place it in the
+                # bottom-right quadrant and let it fill the cell (the default
+                # 'equal' aspect shrinks it to a narrow box).
+                ax = fig.add_subplot(sub_length, 2, 2 * sub_length,
+                                     projection=ccrs.PlateCarree())
+
                 ax.coastlines('50m')
                 ax.add_feature(cf.OCEAN, facecolor='lightblue')
                 ax.add_feature(cf.LAND, facecolor='beige')
                 ax.add_feature(BORDERS2_10m, edgecolor='grey')
                 ax.set_extent([lons[0], lons[1], lats[0], lats[1]])
+                ax.set_aspect('auto')
+                # Label the lat/lon axes with gridline values (lon on the
+                # bottom, lat on the left).
+                gl = ax.gridlines(draw_labels=True, linewidth=0.5,
+                                  color='grey', linestyle='--')
+                gl.top_labels = False
+                gl.right_labels = False
+                gl.xlabel_style = {'size': 8}
+                gl.ylabel_style = {'size': 8}
+            elif isinstance(var, tuple):
+                # A parenthesised entry plots one variable against another
+                # (e.g. GGALT vs ATX/DPXC), so its x-axis is not time and gets
+                # no DateFormatter. May appear anywhere in VARLIST.
+                ax = fig.add_subplot(sub_length, 2, index)
+                ax.grid(color='grey', linestyle='--', linewidth=0.5)
             else:
+                # A plain variable is plotted against time.
                 ax = fig.add_subplot(sub_length, 2, index)
                 ax.grid(color='grey', linestyle='--', linewidth=0.5)
                 ax.xaxis.set_major_formatter(DateFormatter('%H%M'))
             return ax
         for i, var in enumerate(VARLIST, start=1):
             #rotation = 25 if i in [5, 6] else None
-            ax = create_subplot(fig, i)
+            ax = create_subplot(fig, i, var)
             fig.tight_layout()
             axes.append(ax)
             print(var)
@@ -108,9 +129,16 @@ class SubplotAnimation(animation.TimedAnimation):
                     ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.2), ncol=2) 
                 else:
                     ylabel=var[1] + ' [' + anim_file[var[1]].units + ']'
-                    y.append([y1]) 
+                    y.append([y1])
                     lines.append([line])
                     points.append([point])
+                    if i != len(VARLIST):
+                        # Generic variable-vs-variable plot (not the lat/lon
+                        # map, whose extent is set by set_extent).
+                        ax.set_xlim([minx, maxx])
+                        ax.set_ylim([miny, maxy])
+                        ax.set_xlabel(xlabel)
+                        ax.set_ylabel(ylabel)
                 
                 ylabs.append(ylabel)
                 x.append(x1)
@@ -153,6 +181,15 @@ class SubplotAnimation(animation.TimedAnimation):
                     line[l][0].set_data(x1[:i], y1[l][:i])
                     point[l][0].set_data([x1[i]], [y1[l][i]])
         
+        # In preview mode, render only the first frame to a PNG and skip the
+        # full mp4 encode, so the layout can be checked before a long run.
+        if preview:
+            animate(0)
+            preview_file = save_file.rsplit('.mp4', 1)[0] + '_frame0.png'
+            fig.savefig(preview_file, dpi=dpi)
+            print('Saving preview frame ' + preview_file)
+            return
+
         anim = animation.FuncAnimation(fig, animate, frames=len(x[0]), blit = False) #,
         anim.save(save_file, fps=fps, dpi=dpi)
         print('Saving ' + save_file)
@@ -268,7 +305,14 @@ def setup_flight_vars(flight):
             pass
 
 def main():
-    
+
+    parser = argparse.ArgumentParser(
+        description='Create timeseries animations for the configured flights.')
+    parser.add_argument('--preview', action='store_true',
+                        help='Render only the first frame of each flight to a '
+                             'PNG and skip the mp4 encode, to check the layout.')
+    args = parser.parse_args()
+
     # Perform checks to see if dirs are already present, make them if not
     dir_check(dat)
     dir_check(flight_movie_dir)
@@ -276,6 +320,11 @@ def main():
 
     for flight in flights:
         setup_flight_vars(flight)
+
+        if args.preview:
+            SubplotAnimation(preview=True)
+            continue
+
     # Read in the movie file created from CombineCameras.pl
         if os.path.exists(flight_movie_dir + flight_movie):
 
