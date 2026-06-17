@@ -17,11 +17,13 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import animation as animation
+import animation_config
 from animation_config import project, flights, dat, flight_movie_dir, output_dir, VARLIST, dpi, fps, LineColor, LineColor2, width, PointColor
 from layout import subplot_rows, classify_entry, subplot_position
 import xarray as xr
 import os
 import fnmatch
+import shutil
 import subprocess
 import pandas as pd
 import logging
@@ -210,6 +212,16 @@ def dir_check(directory):
             logging.error('Bailing out')
             exit(1)
 
+def archive_config():
+    '''Copy the active animation_config.py into output_dir as a record of the
+    settings used to produce the outputs.'''
+    # Be sure to find src file even if running from a different dir
+    src = animation_config.__file__
+    dest = os.path.join(output_dir, 'animation_config.py')
+    if os.path.abspath(src) != os.path.abspath(dest):
+        shutil.copy(src, dest)
+        print('Archived config to ' + dest)
+
 def process_animation(flight, render=True):
     print('*******************************************')
     print('******   Starting flight animation   ******')
@@ -240,20 +252,28 @@ def process_animation(flight, render=True):
     height = height.rstrip().decode('utf-8')
     dims = width+height
 
+    # The ffmpeg intermediates and the final combined mp4 all live alongside
+    # save_file in output_dir. Build the mid_/final_ names from the basename
+    # so the prefix is not prepended to the directory path.
+    base = os.path.basename(save_file)
+    mid_file = os.path.join(output_dir, 'mid_' + base)
+    final_file = os.path.join(output_dir, 'final_' + base)
+    output_file = os.path.join(output_dir, project + flight + '.mp4')
+
     # Update duration of the animation mp4 to align with flight movie
-    command = 'ffmpeg -i ' + save_file + ' -filter:v setpts=' + scalefactor + '*PTS mid_' + save_file
+    command = 'ffmpeg -i ' + save_file + ' -filter:v setpts=' + scalefactor + '*PTS ' + mid_file
     os.system(command)
 
-    command = 'ffmpeg -i mid_' + save_file + ' -s ' + dims + ' -c:a copy final_' + save_file
+    command = 'ffmpeg -i ' + mid_file + ' -s ' + dims + ' -c:a copy ' + final_file
     os.system(command)
 
-    command = 'ffmpeg -i ' + flight_movie_dir + flight_movie + ' -i final_' + save_file + ' -filter_complex hstack,format=yuv420p -c:v libx264 -crf 18 ' + output_dir + project + flight + '.mp4'
+    command = 'ffmpeg -i ' + flight_movie_dir + flight_movie + ' -i ' + final_file + ' -filter_complex hstack,format=yuv420p -c:v libx264 -crf 18 ' + output_file
     os.system(command)
 
-    command = 'rm mid_' + save_file
+    command = 'rm ' + mid_file
     os.system(command)
 
-    command = 'rm final_' + save_file
+    command = 'rm ' + final_file
     os.system(command)
 
 def get_flight_area(dataset):
@@ -306,7 +326,9 @@ def setup_flight_vars(flight):
     flight_data = f"{dat}/{file_project}{flight}.nc"
 
     anim_file = xr.open_dataset(flight_data)
-    save_file = project + flight + 'animation.mp4'
+    # Write all generated files (animation, preview image, ffmpeg
+    # intermediates, final combined mp4) to output_dir.
+    save_file = os.path.join(output_dir, project + flight + 'animation.mp4')
     for file in os.listdir(flight_movie_dir):
         if fnmatch.fnmatch(file, '*' + flight + '*.mp4'):
             flight_movie = file
@@ -341,6 +363,9 @@ def main():
     dir_check(dat)
     dir_check(flight_movie_dir)
     dir_check(output_dir)
+
+    # Archive the config used for this run alongside the outputs.
+    archive_config()
 
     for flight in flights:
         setup_flight_vars(flight)
