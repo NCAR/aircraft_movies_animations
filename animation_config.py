@@ -4,18 +4,31 @@
 # Configuration for timeseries_animation.py 
 #######################################################################
 
-# Provide project, flight, and location of data file
-# Provide project, flight, and location of data file
+import os
+
+# Provide project, flight
 project = "CAESAR"
 flights = ["rf09","rf10"] ##must be a list even if only processing one flight
-dat = f"/scr/raf_data/{project}"
-#flight_data = f"{dat}/{project}{flight}.nc"
+
+# Check for required environment variables
+if "DATA_DIR" not in os.environ:
+    print("Error: DATA_DIR environment variable is not set.")
+    exit(1)
+if "RAW_DATA_DIR" not in os.environ:
+    print("Error: RAW_DATA_DIR environment variable is not set.")
+    exit(1)
+
+# Build location of data file from env vars.
+dat = os.path.join(os.environ["DATA_DIR"], project)
 
 # Define where the existing digital camera movies are located
-flight_movie_dir = f"/scr/raf/Raw_Data/{project}/Movies/"
-##flight_movie = "rf01.240408.160031_201559.mp4" ## Currently, the flight movie is found by the timeseries_animation.py script, but could be set here
+flight_movie_dir = os.path.join(os.environ["RAW_DATA_DIR"], project, "Movies/")
+
+## Currently, the flight movie is found by the timeseries_animation.py script, but could be set here
+##flight_movie = "rf01.240408.160031_201559.mp4"
+
 # Define where you would like the output .mp4 to be written
-output_dir = "/h/eol/srunkel/aircraft_movies_animations/"
+output_dir = os.path.join(os.environ["RAW_DATA_DIR"], project, "Animations/")
 
 # Animation variable selection
 Var1 = "GGALT"
