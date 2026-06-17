@@ -196,7 +196,9 @@ class SubplotAnimation(animation.TimedAnimation):
         anim = animation.FuncAnimation(fig, animate, frames=len(x[0]), blit = False) #,
         anim.save(save_file, fps=fps, dpi=dpi)
         print('Saving ' + save_file)
+
 # Define function to check to make sure supplied vars are in the .nc file
+
 def dir_check(directory):
 
     if not os.path.isdir(directory):
@@ -207,7 +209,6 @@ def dir_check(directory):
             logging.error(message)
             logging.error('Bailing out')
             exit(1)
-
 
 def process_animation(flight, render=True):
     print('*******************************************')
@@ -254,8 +255,6 @@ def process_animation(flight, render=True):
 
     command = 'rm final_' + save_file
     os.system(command)
-
-
 
 def get_flight_area(dataset):
         # Assuming 'dataset' is an xarray Dataset with the required attributes
@@ -316,7 +315,8 @@ def setup_flight_vars(flight):
         else:
             pass
 
-def main():
+def parse_args():
+    """ Instantiate a command line argument parser """
 
     parser = argparse.ArgumentParser(
         description='Create timeseries animations for the configured flights.')
@@ -330,6 +330,13 @@ def main():
                              'frames.')
     args = parser.parse_args()
 
+    return args
+
+def main():
+
+    # Process command line arguments.
+    args = parse_args()
+
     # Perform checks to see if dirs are already present, make them if not
     dir_check(dat)
     dir_check(flight_movie_dir)
@@ -339,10 +346,12 @@ def main():
         setup_flight_vars(flight)
 
         if args.preview:
+            # Only create one frame then exit. Useful when determining if the
+            # generated plots are correct.
             SubplotAnimation(preview=True)
             continue
 
-    # Read in the movie file created from CombineCameras.pl
+        # Read in the movie file created from CombineCameras.pl
         if os.path.exists(flight_movie_dir + flight_movie):
 
             process_animation(flight, render=not args.combine_only)
