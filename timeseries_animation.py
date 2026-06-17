@@ -160,7 +160,7 @@ class SubplotAnimation(animation.TimedAnimation):
             for line, point, x1,y1 in zip(lines,points,x, y):
                 for l in range(len(line)):
                     line[l][0].set_data(x1[:i], y1[l][:i])
-                    point[l][0].set_data(x1[i], y1[l][i])
+                    point[l][0].set_data([x1[i]], [y1[l][i]])
         
         anim = animation.FuncAnimation(fig, animate, frames=len(x[0]), blit = False) #,
         anim.save(save_file, fps=fps, dpi=dpi)
