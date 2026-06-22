@@ -28,17 +28,22 @@ The variables in the parameter file will need to be updated to reflect your proj
 
 ## Running tests
 
-Unit tests for the subplot layout logic live in `test_layout.py` and use only
-the Python standard library (`unittest`) plus `layout.py`, so they run without
-matplotlib, cartopy, or any data files. They verify that both supported
-`VARLIST` styles (two variables on one plot, and two variables plotted against
-each other) map onto the subplot grid correctly.
+Unit tests use only the Python standard library (`unittest`), so they run
+without matplotlib, cartopy, or any data files:
 
-Run them from the repo root with:
+- `test_layout.py` (with `layout.py`) verifies that both supported `VARLIST`
+  styles (two variables on one plot, and two variables plotted against each
+  other) map onto the subplot grid correctly.
+- `test_paths.py` (with `paths.py`) verifies that the platform directory under
+  `PROJ_DIR/project` is parsed correctly, including with extra files, oddly
+  named entries, and multiple directories (which prompt for a selection).
+
+Run all tests from the repo root with:
 ```
-python3 -m unittest test_layout
+python3 -m unittest discover
 ```
-Add `-v` for per-test output:
+Or run a single suite, optionally with `-v` for per-test output:
 ```
 python3 -m unittest test_layout -v
+python3 -m unittest test_paths -v
 ```
