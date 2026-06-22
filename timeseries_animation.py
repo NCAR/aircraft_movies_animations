@@ -237,18 +237,25 @@ def process_animation(flight, render=True):
 
     # Use ffmpeg to align the duration based on number of frames and frame rates
     # This will get the duration of the flight movie file and store as a variable
-    Duration1 = subprocess.check_output('ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 ' + flight_movie_dir + flight_movie, shell=True)
+    Duration1 = subprocess.check_output(
+        ['ffprobe', '-v', 'error', '-show_entries', 'format=duration',
+         '-of', 'default=noprint_wrappers=1:nokey=1',
+         flight_movie_dir + flight_movie])
     Duration1 = float(Duration1)
 
     # This sets frame rate for the animation file and store as a variable
-    Duration2 = subprocess.check_output('ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 ' + save_file, shell=True)
+    Duration2 = subprocess.check_output(
+        ['ffprobe', '-v', 'error', '-show_entries', 'format=duration',
+         '-of', 'default=noprint_wrappers=1:nokey=1', save_file])
     Duration2 = float(Duration2)
 
     # Perform the calculation
     scalefactor = str(Duration1 / Duration2)
 
     # Extract the hieght from the camera image .mp4 for use in the creation of the animations
-    height = subprocess.check_output("ffprobe -v error -show_entries stream=height -of csv=p=0:s=x " + flight_movie_dir + flight_movie, shell=True)
+    height = subprocess.check_output(
+        ['ffprobe', '-v', 'error', '-show_entries', 'stream=height',
+         '-of', 'csv=p=0:s=x', flight_movie_dir + flight_movie])
     height = height.rstrip().decode('utf-8')
     dims = width+height
 
@@ -261,20 +268,20 @@ def process_animation(flight, render=True):
     output_file = os.path.join(output_dir, project + flight + '.mp4')
 
     # Update duration of the animation mp4 to align with flight movie
-    command = 'ffmpeg -i ' + save_file + ' -filter:v setpts=' + scalefactor + '*PTS ' + mid_file
-    os.system(command)
+    subprocess.run(['ffmpeg', '-i', save_file,
+                    '-filter:v', 'setpts=' + scalefactor + '*PTS',
+                    mid_file], check=True)
 
-    command = 'ffmpeg -i ' + mid_file + ' -s ' + dims + ' -c:a copy ' + final_file
-    os.system(command)
+    subprocess.run(['ffmpeg', '-i', mid_file, '-s', dims,
+                    '-c:a', 'copy', final_file], check=True)
 
-    command = 'ffmpeg -i ' + flight_movie_dir + flight_movie + ' -i ' + final_file + ' -filter_complex hstack,format=yuv420p -c:v libx264 -crf 18 ' + output_file
-    os.system(command)
+    subprocess.run(['ffmpeg', '-i', flight_movie_dir + flight_movie,
+                    '-i', final_file,
+                    '-filter_complex', 'hstack,format=yuv420p',
+                    '-c:v', 'libx264', '-crf', '18', output_file], check=True)
 
-    command = 'rm ' + mid_file
-    os.system(command)
-
-    command = 'rm ' + final_file
-    os.system(command)
+    os.remove(mid_file)
+    os.remove(final_file)
 
 def get_flight_area(dataset):
         # Assuming 'dataset' is an xarray Dataset with the required attributes
@@ -388,8 +395,10 @@ def main():
             process = input('If you are at NCAR RAF and you would like to generate the camera images .mp4 file, press Enter. Anything else will not process.')
 
             if process == '':
-                command = ('/net/work/bin/converters/createMovies/combineCameras.pl /net/jlocal/projects/SOCRATES/GV_N677F/scripts/' + project + '.paramfile ' + flight)
-                os.system(command)
+                command = ['/net/work/bin/converters/createMovies/combineCameras.pl',
+                           '/net/jlocal/projects/SOCRATES/GV_N677F/scripts/' + project + '.paramfile',
+                           flight]
+                subprocess.run(command, check=True)
                 print(command)
 
             elif process != '':
