@@ -20,6 +20,7 @@ from matplotlib import animation as animation
 import animation_config
 from animation_config import project, flights, dat, flight_movie_dir, output_dir, VARLIST, dpi, fps, LineColor, LineColor2, width, PointColor
 from layout import subplot_rows, classify_entry, subplot_position
+from paths import find_platform
 import xarray as xr
 import os
 import fnmatch
@@ -392,14 +393,20 @@ def main():
         else:
             print('Could not find a camera images .mp4 file in: ' + flight_movie_dir + flight + '*')
             print('Please download the .mp4 file from https://data.eol.ucar.edu/')
-            process = input('If you are at NCAR RAF and you would like to generate the camera images .mp4 file, press Enter. Anything else will not process.')
+            process = input('If you are at NCAR RAF and you would like to ' + \
+                            'generate the camera images .mp4 file, press ' + \
+                            'Enter. Anything else will not process.')
 
             if process == '':
-                command = ['/net/work/bin/converters/createMovies/combineCameras.pl',
-                           '/net/jlocal/projects/SOCRATES/GV_N677F/scripts/' + project + '.paramfile',
-                           flight]
-                subprocess.run(command, check=True)
+                proj_path = os.path.join(os.environ["PROJ_DIR"], project)
+                # The platform (e.g. GV_N677F) is the directory component that
+                # sits under PROJ_DIR/project.
+                platform = find_platform(proj_path)
+                script = os.path.join(proj_path, platform, "scripts",
+                                      "createMovies.sh")
+                command = [script,'-p',project,flight]
                 print(command)
+                subprocess.run(command, check=True)
 
             elif process != '':
                 print('Please download the desired .mp4 camera images file and start again.')
