@@ -17,6 +17,9 @@ if "DATA_DIR" not in os.environ:
 if "RAW_DATA_DIR" not in os.environ:
     print("Error: RAW_DATA_DIR environment variable is not set.")
     exit(1)
+if "PROJ_DIR" not in os.environ:
+    print("Error: PROJ_DIR environment variable is not set.")
+    exit(1)
 
 # Build location of data file from env vars.
 dat = os.path.join(os.environ["DATA_DIR"], project)
