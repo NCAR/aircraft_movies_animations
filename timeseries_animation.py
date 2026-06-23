@@ -367,6 +367,25 @@ def main():
     # Process command line arguments.
     args = parse_args()
 
+    # Check for required environment variables. Exit if not found.
+     if 'DATA_DIR' not in os.environ:
+        print('DATA_DIR environment variable not set.')
+        exit(1)
+    if 'RAW_DATA_DIR' not in os.environ:
+        print('RAW_DATA_DIR environment variable not set.')
+        exit(1)
+    if 'PROJ_DIR' not in os.environ:
+        print('PROJ_DIR environment variable not set.')
+        exit(1)
+
+    # Build the paths to the data directories based on the environment variables.
+    # - Build location of data
+    dat = os.path.join(os.environ['DATA_DIR'], project)
+    # - Define where the existing digital camera movies are located
+    flight_movie_dir = os.path.join(os.environ['RAW_DATA_DIR'], project, "Movies/")
+    # - Define where the output .mp4 files will be written
+    output_dir = os.path.join(os.environ['RAW_DATA_DIR'], project, "Animations/")
+
     # Perform checks to see if dirs are already present, make them if not
     dir_check(dat)
     dir_check(flight_movie_dir)

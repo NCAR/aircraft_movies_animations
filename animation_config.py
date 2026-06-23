@@ -10,29 +10,6 @@ import os
 project = "CAESAR"
 flights = ["rf09","rf10"] ##must be a list even if only processing one flight
 
-# Check for required environment variables
-if "DATA_DIR" not in os.environ:
-    print("Error: DATA_DIR environment variable is not set.")
-    exit(1)
-if "RAW_DATA_DIR" not in os.environ:
-    print("Error: RAW_DATA_DIR environment variable is not set.")
-    exit(1)
-if "PROJ_DIR" not in os.environ:
-    print("Error: PROJ_DIR environment variable is not set.")
-    exit(1)
-
-# Build location of data file from env vars.
-dat = os.path.join(os.environ["DATA_DIR"], project)
-
-# Define where the existing digital camera movies are located
-flight_movie_dir = os.path.join(os.environ["RAW_DATA_DIR"], project, "Movies/")
-
-## Currently, the flight movie is found by the timeseries_animation.py script, but could be set here
-##flight_movie = "rf01.240408.160031_201559.mp4"
-
-# Define where you would like the output .mp4 to be written
-output_dir = os.path.join(os.environ["RAW_DATA_DIR"], project, "Animations/")
-
 # Uncomment and edit one of the following types of plots
 # Example animation variable selection with two vars in one plot
 #Var1 = "GGALT"
