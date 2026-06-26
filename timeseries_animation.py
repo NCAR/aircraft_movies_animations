@@ -12,7 +12,9 @@
 # Author: TMT
 #######################################################################
 
+from __future__ import annotations  # allow `str | None` on Python 3.9
 import argparse
+from dataclasses import dataclass
 import math
 import numpy as np
 import matplotlib.pyplot as plt
@@ -23,7 +25,6 @@ from paths import find_platform
 import xarray as xr
 import os
 import fnmatch
-import shutil
 import subprocess
 import pandas as pd
 import logging
@@ -33,20 +34,40 @@ from datetime import datetime
 import re
 from matplotlib.dates import DateFormatter
 
+# Class to hold configuration so we don't need global vars and dependencies
+# are more easily traced.
+@dataclass
+class FlightContext:
+    '''Per-flight values discovered by setup_flight_vars and consumed by
+    SubplotAnimation and process_animation. Bundling them into one returned
+    object keeps the data flow between those functions explicit instead of
+    routing it through module globals.
+
+    flight_data and save_file are always set. The movie-dependent fields
+    (flight_movie, flight_time, lats, lons) stay None when no camera movie
+    matching the flight is found.'''
+    flight_data: str                  # path to the flight's .nc data file
+    save_file: str                    # path the animation mp4 is written to
+    flight_movie: str | None = None   # camera movie filename, if found
+    flight_time: slice | None = None  # time slice spanning the movie
+    lats: tuple | None = None         # (min, max) latitude bounds
+    lons: tuple | None = None         # (min, max) longitude bounds
+
 class SubplotAnimation(animation.TimedAnimation):
     '''
     Animation set up
     Reads the variables listed in the configuration setup
     '''
 
-    def __init__(self, preview=False):
+    def __init__(self, flight_vars, preview=False):
 
         print('Creating figure subplots')
         fig = plt.figure(figsize=(8, 10))
         plt.rcParams.update({'font.size': 12})
         plt.rc("xtick", labelsize=10)
         plt.rc("ytick", labelsize=10)
-        anim_file = xr.open_dataset(flight_data).sel(Time = flight_time)
+        anim_file = (xr.open_dataset(flight_vars.flight_data)
+                     .sel(Time=flight_vars.flight_time))
 
         ##add map for lat lon plots
 
@@ -78,7 +99,8 @@ class SubplotAnimation(animation.TimedAnimation):
                 ax.add_feature(cf.OCEAN, facecolor='lightblue')
                 ax.add_feature(cf.LAND, facecolor='beige')
                 ax.add_feature(BORDERS2_10m, edgecolor='grey')
-                ax.set_extent([lons[0], lons[1], lats[0], lats[1]])
+                ax.set_extent([flight_vars.lons[0], flight_vars.lons[1],
+                               flight_vars.lats[0], flight_vars.lats[1]])
                 ax.set_aspect('auto')
                 # Label the lat/lon axes with gridline values (lon on the
                 # bottom, lat on the left).
@@ -190,14 +212,16 @@ class SubplotAnimation(animation.TimedAnimation):
         # full mp4 encode, so the layout can be checked before a long run.
         if preview:
             animate(0)
-            preview_file = save_file.rsplit('.mp4', 1)[0] + '_frame0.png'
+            preview_file = flight_vars.save_file.rsplit('.mp4', 1)[0] + \
+                           '_frame0.png'
             fig.savefig(preview_file, dpi=dpi)
             print('Saving preview frame ' + preview_file)
             return
 
-        anim = animation.FuncAnimation(fig, animate, frames=len(x[0]), blit = False) #,
-        anim.save(save_file, fps=fps, dpi=dpi)
-        print('Saving ' + save_file)
+        anim = animation.FuncAnimation(fig, animate, frames=len(x[0]),
+                                       blit = False) #,
+        anim.save(flight_vars.save_file, fps=fps, dpi=dpi)
+        print('Saving ' + flight_vars.save_file)
 
 # Define function to check to make sure supplied vars are in the .nc file
 
@@ -212,16 +236,16 @@ def dir_check(directory):
             logging.error('Bailing out')
             exit(1)
 
-def process_animation(flight, render=True):
+def process_animation(flight_vars, flight, render=True):
     print('*******************************************')
     print('******   Starting flight animation   ******')
     print('*******************************************')
-    print('Using flight data file: ' + flight_data)
+    print('Using flight data file: ' + flight_vars.flight_data)
 
     if render:
-        ani = SubplotAnimation()
-    elif not os.path.exists(save_file):
-        print('Cannot combine: ' + save_file + ' does not exist. '
+        ani = SubplotAnimation(flight_vars)
+    elif not os.path.exists(flight_vars.save_file):
+        print('Cannot combine: ' + flight_vars.save_file + ' does not exist. '
               'Run without --combine-only first to create the frames.')
         return
 
@@ -230,13 +254,13 @@ def process_animation(flight, render=True):
     Duration1 = subprocess.check_output(
         ['ffprobe', '-v', 'error', '-show_entries', 'format=duration',
          '-of', 'default=noprint_wrappers=1:nokey=1',
-         flight_movie_dir + flight_movie])
+         flight_movie_dir + flight_vars.flight_movie])
     Duration1 = float(Duration1)
 
     # This sets frame rate for the animation file and store as a variable
     Duration2 = subprocess.check_output(
         ['ffprobe', '-v', 'error', '-show_entries', 'format=duration',
-         '-of', 'default=noprint_wrappers=1:nokey=1', save_file])
+         '-of', 'default=noprint_wrappers=1:nokey=1', flight_vars.save_file])
     Duration2 = float(Duration2)
 
     # Perform the calculation
@@ -245,27 +269,27 @@ def process_animation(flight, render=True):
     # Extract the hieght from the camera image .mp4 for use in the creation of the animations
     height = subprocess.check_output(
         ['ffprobe', '-v', 'error', '-show_entries', 'stream=height',
-         '-of', 'csv=p=0:s=x', flight_movie_dir + flight_movie])
+         '-of', 'csv=p=0:s=x', flight_movie_dir + flight_vars.flight_movie])
     height = height.rstrip().decode('utf-8')
     dims = width+height
 
     # The ffmpeg intermediates and the final combined mp4 all live alongside
     # save_file in output_dir. Build the mid_/final_ names from the basename
     # so the prefix is not prepended to the directory path.
-    base = os.path.basename(save_file)
+    base = os.path.basename(flight_vars.save_file)
     mid_file = os.path.join(output_dir, 'mid_' + base)
     final_file = os.path.join(output_dir, 'final_' + base)
     output_file = os.path.join(output_dir, project + flight + '.mp4')
 
     # Update duration of the animation mp4 to align with flight movie
-    subprocess.run(['ffmpeg', '-i', save_file,
+    subprocess.run(['ffmpeg', '-i', flight_vars.save_file,
                     '-filter:v', 'setpts=' + scalefactor + '*PTS',
                     mid_file], check=True)
 
     subprocess.run(['ffmpeg', '-i', mid_file, '-s', dims,
                     '-c:a', 'copy', final_file], check=True)
 
-    subprocess.run(['ffmpeg', '-i', flight_movie_dir + flight_movie,
+    subprocess.run(['ffmpeg', '-i', flight_movie_dir + flight_vars.flight_movie,
                     '-i', final_file,
                     '-filter_complex', 'hstack,format=yuv420p',
                     '-c:v', 'libx264', '-crf', '18', output_file], check=True)
@@ -308,38 +332,32 @@ def create_time_slice(filename):
     return time_slice
 
 def setup_flight_vars(flight):
-    ##Setup the global variables for plotting and animation for each flight
-    global flight_movie
-    global flight_time
-    global lats
-    global lons
-    global flight_data
-    global anim_file
-    global save_file
+    '''
+    Gather the variables needed for plotting and animation for each flight
+    and return them as a FlightContext. flight_data and save_file are always
+    set; the movie-dependent fields are filled in only if a camera movie
+    matching the flight is found.
+    '''
 
+    # PROJECT-SPECIFIC FIX
     # The TI3GER-2 data files drop the dash in their names (e.g. TI3GER2rf01.nc)
     # even though the project directory keeps it.
     file_project = project.replace('-', '') if project == 'TI3GER-2' else project
+
     flight_data = f"{dat}/{file_project}{flight}.nc"
 
     anim_file = xr.open_dataset(flight_data)
     # Write all generated files (animation, preview image, ffmpeg
     # intermediates, final combined mp4) to output_dir.
     save_file = os.path.join(output_dir, project + flight + 'animation.mp4')
-    print("Finding movies in " + flight_movie_dir)
-    flight_movie = None
+
+    flight_vars = FlightContext(flight_data=flight_data, save_file=save_file)
     for file in os.listdir(flight_movie_dir):
         if fnmatch.fnmatch(file, '*' + flight + '*.mp4'):
-            flight_movie = file
-            lats, lons = get_flight_area(anim_file)
-            flight_time=create_time_slice(file)
-        else:
-            pass
-    if flight_movie is None:
-        print("No .mp4 for flight " + flight + " found in " + flight_movie_dir)
-        # TODO: Spawn off creation of movie if it doesn't exist but for now...
-        #print("Generating movie...")
-        exit(1)
+            flight_vars.flight_movie = file
+            flight_vars.lats, flight_vars.lons = get_flight_area(anim_file)
+            flight_vars.flight_time = create_time_slice(file)
+    return flight_vars
 
 def parse_args():
     """ Instantiate a command line argument parser """
@@ -415,18 +433,18 @@ def main():
     dir_check(output_dir)
 
     for flight in flights:
-        setup_flight_vars(flight)
+        flight_vars = setup_flight_vars(flight)
 
         if args.preview:
             # Only create one frame then exit. Useful when determining if the
             # generated plots are correct.
-            SubplotAnimation(preview=True)
+            SubplotAnimation(flight_vars, preview=True)
             continue
 
         # Read in the movie file created from CombineCameras.pl
-        if os.path.exists(flight_movie_dir + flight_movie):
+        if flight_vars.flight_movie is not None and os.path.exists(flight_movie_dir + flight_vars.flight_movie):
 
-            process_animation(flight, render=not args.combine_only)
+            process_animation(flight_vars, flight, render=not args.combine_only)
 
         # If the movie file doesn't exist, then see if the user wants to make it.
         else:
