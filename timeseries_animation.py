@@ -326,6 +326,8 @@ def setup_flight_vars(flight):
     # Write all generated files (animation, preview image, ffmpeg
     # intermediates, final combined mp4) to output_dir.
     save_file = os.path.join(output_dir, project + flight + 'animation.mp4')
+    print("Finding movies in " + flight_movie_dir)
+    flight_movie = None
     for file in os.listdir(flight_movie_dir):
         if fnmatch.fnmatch(file, '*' + flight + '*.mp4'):
             flight_movie = file
@@ -333,6 +335,11 @@ def setup_flight_vars(flight):
             flight_time=create_time_slice(file)
         else:
             pass
+    if flight_movie is None:
+        print("No .mp4 for flight " + flight + " found in " + flight_movie_dir)
+        # TODO: Spawn off creation of movie if it doesn't exist but for now...
+        #print("Generating movie...")
+        exit(1)
 
 def parse_args():
     """ Instantiate a command line argument parser """
@@ -391,6 +398,16 @@ def main():
     # $PROJ_DIR/<project>/<platform>/scripts), copy the template there and stop
     # so template can be configured for the project.
     config = config_loader.load(project)
+
+    # Bind the per-project settings from the loaded config
+    flights = config.flights
+    VARLIST = config.VARLIST
+    dpi = config.dpi
+    fps = config.fps
+    LineColor = config.LineColor
+    LineColor2 = config.LineColor2
+    PointColor = config.PointColor
+    width = config.width
 
     # Perform checks to see if dirs are already present, make them if not
     dir_check(dat)
