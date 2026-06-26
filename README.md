@@ -46,4 +46,5 @@ Or run a single suite, optionally with `-v` for per-test output:
 ```
 python3 -m unittest test_layout -v
 python3 -m unittest test_paths -v
+python3 -m unittest test_config_loader -v
 ```

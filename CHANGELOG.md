@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Copy animation_config.py to $PROJ_DIR/<project>/<platform>/scripts on first
+  run and subsequently read it from there. This allows the config to be saved
+  with the project for documentation purposes and easy reuse.
 - `--combine-only` command line option to rerun the ffmpeg combine steps and
   reuse the existing animation `.mp4` without regenerating frames.
 - `--preview` command line option to render only the first frame of each flight

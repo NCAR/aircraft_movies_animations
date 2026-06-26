@@ -17,8 +17,7 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import animation as animation
-import animation_config
-from animation_config import project, flights, dat, flight_movie_dir, output_dir, VARLIST, dpi, fps, LineColor, LineColor2, width, PointColor
+import config_loader
 from layout import subplot_rows, classify_entry, subplot_position
 from paths import find_platform
 import xarray as xr
@@ -213,16 +212,6 @@ def dir_check(directory):
             logging.error('Bailing out')
             exit(1)
 
-def archive_config():
-    '''Copy the active animation_config.py into output_dir as a record of the
-    settings used to produce the outputs.'''
-    # Be sure to find src file even if running from a different dir
-    src = animation_config.__file__
-    dest = os.path.join(output_dir, 'animation_config.py')
-    if os.path.abspath(src) != os.path.abspath(dest):
-        shutil.copy(src, dest)
-        print('Archived config to ' + dest)
-
 def process_animation(flight, render=True):
     print('*******************************************')
     print('******   Starting flight animation   ******')
@@ -350,6 +339,11 @@ def parse_args():
 
     parser = argparse.ArgumentParser(
         description='Create timeseries animations for the configured flights.')
+    parser.add_argument('-p', '--project',
+                        help='Project name (e.g. CAESAR). Falls back to the '
+                             '$PROJECT environment variable. On the first run '
+                             'for a project the config template is copied into '
+                             'the project scripts dir for you to edit.')
     parser.add_argument('--preview', action='store_true',
                         help='Render only the first frame of each flight to a '
                              'PNG and skip the mp4 encode, to check the layout.')
@@ -367,8 +361,12 @@ def main():
     # Process command line arguments.
     args = parse_args()
 
+    # Set variables that used to be imported from animation_config as global
+    global project, flights, dat, flight_movie_dir, output_dir
+    global VARLIST, dpi, fps, LineColor, LineColor2, PointColor, width
+
     # Check for required environment variables. Exit if not found.
-     if 'DATA_DIR' not in os.environ:
+    if 'DATA_DIR' not in os.environ:
         print('DATA_DIR environment variable not set.')
         exit(1)
     if 'RAW_DATA_DIR' not in os.environ:
@@ -378,7 +376,10 @@ def main():
         print('PROJ_DIR environment variable not set.')
         exit(1)
 
-    # Build the paths to the data directories based on the environment variables.
+    # Determine project
+    project = config_loader.resolve_project(args.project)
+
+    # Build the paths to the data directories based on the environment variables
     # - Build location of data
     dat = os.path.join(os.environ['DATA_DIR'], project)
     # - Define where the existing digital camera movies are located
@@ -386,13 +387,15 @@ def main():
     # - Define where the output .mp4 files will be written
     output_dir = os.path.join(os.environ['RAW_DATA_DIR'], project, "Animations/")
 
+    # Read the configuration file. On the first run for a project (no config in
+    # $PROJ_DIR/<project>/<platform>/scripts), copy the template there and stop
+    # so template can be configured for the project.
+    config = config_loader.load(project)
+
     # Perform checks to see if dirs are already present, make them if not
     dir_check(dat)
     dir_check(flight_movie_dir)
     dir_check(output_dir)
-
-    # Archive the config used for this run alongside the outputs.
-    archive_config()
 
     for flight in flights:
         setup_flight_vars(flight)
