@@ -28,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic detection of flight area and time, and a plot legend.
 
 ### Changed
+- Moved content of SubplotAnimation class to animate.py and got rid of
+  the vestigial class that inherited, but did not use, animation.TimedAnimation
+  Refactored logical code blocks into functions
+- Group global vars into FlightContext and RunContext data classes.
 - Build data and movie locations from environment variables (`DATA_DIR`,
   `RAW_DATA_DIR`) instead of hardcoded paths.
 - Read flight data with xarray; no longer depends on `nc_utils`.
@@ -37,6 +41,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   README.
 
 ### Fixed
+- flight_time is only set when a matching camera movie is found. In
+  preview mode (layout check) plot the whole flight so can check layout
+  with no movie present.
+- lats/lons come from the data file's global attributes, not the camera
+  movie. Set them unconditionally so can run in --preview mode and test
+  plot layout when no movie is present.
+- For GGLON/GGLAT plot, skip tightening the layout. Causes crash in newer
+  cartopy versions - position is already determined in any case.
 - Combine step failed with `No such filter: ''` due to a space in the ffmpeg
   `-filter_complex hstack,format=yuv420p` argument under `shell=True`.
 - Plotting broke the generic "var1 vs var2" case after the CAESAR special case

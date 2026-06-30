@@ -16,36 +16,32 @@ from __future__ import annotations  # allow `str | None` on Python 3.9
 import argparse
 from dataclasses import dataclass
 import math
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib import animation as animation
 import config_loader
-from layout import subplot_rows, classify_entry, subplot_position
 from paths import find_platform
+import animate
 import xarray as xr
 import os
 import fnmatch
 import subprocess
-import pandas as pd
 import logging
 import cartopy.feature as cf
 import cartopy.crs as ccrs
 from datetime import datetime
 import re
-from matplotlib.dates import DateFormatter
 
 # Class to hold configuration so we don't need global vars and dependencies
 # are more easily traced.
 @dataclass
 class FlightContext:
     '''Per-flight values discovered by setup_flight_vars and consumed by
-    SubplotAnimation and process_animation. Bundling them into one returned
+    animate.plot and process_animation. Bundling them into one returned
     object keeps the data flow between those functions explicit instead of
     routing it through module globals.
 
-    flight_data and save_file are always set. The movie-dependent fields
-    (flight_movie, flight_time, lats, lons) stay None when no camera movie
-    matching the flight is found.'''
+    flight_data, save_file, lats and lons are always set (lats/lons come from
+    the data file's global attributes). The movie-dependent fields
+    (flight_movie, flight_time) stay None when no camera movie matching the
+    flight is found.'''
     flight_data: str                  # path to the flight's .nc data file
     save_file: str                    # path the animation mp4 is written to
     flight_movie: str | None = None   # camera movie filename, if found
@@ -53,179 +49,17 @@ class FlightContext:
     lats: tuple | None = None         # (min, max) latitude bounds
     lons: tuple | None = None         # (min, max) longitude bounds
 
-class SubplotAnimation(animation.TimedAnimation):
-    '''
-    Animation set up
-    Reads the variables listed in the configuration setup
-    '''
-
-    def __init__(self, flight_vars, preview=False):
-
-        print('Creating figure subplots')
-        fig = plt.figure(figsize=(8, 10))
-        plt.rcParams.update({'font.size': 12})
-        plt.rc("xtick", labelsize=10)
-        plt.rc("ytick", labelsize=10)
-        anim_file = (xr.open_dataset(flight_vars.flight_data)
-                     .sel(Time=flight_vars.flight_time))
-
-        ##add map for lat lon plots
-
-        BORDERS2_10m = cf.NaturalEarthFeature('cultural', 'admin_1_states_provinces',
-                                              '50m', edgecolor='black', facecolor='none')
-
-        # Your latitude and longitude data
-        sub_length = subplot_rows(len(VARLIST))
-        axes = []
-        lines = []
-        x = []
-        y = []
-        xlims = []
-        ylims = []
-        xlabs = []
-        ylabs = []
-        points = []
-        def create_subplot(fig, index, var):
-            kind = classify_entry(index, len(VARLIST), var)
-            nrows, ncols, pos = subplot_position(index, len(VARLIST))
-            if kind == 'map':
-                # The last entry is always the lat/lon map: place it in the
-                # bottom-right quadrant and let it fill the cell (the default
-                # 'equal' aspect shrinks it to a narrow box).
-                ax = fig.add_subplot(nrows, ncols, pos,
-                                     projection=ccrs.PlateCarree())
-
-                ax.coastlines('50m')
-                ax.add_feature(cf.OCEAN, facecolor='lightblue')
-                ax.add_feature(cf.LAND, facecolor='beige')
-                ax.add_feature(BORDERS2_10m, edgecolor='grey')
-                ax.set_extent([flight_vars.lons[0], flight_vars.lons[1],
-                               flight_vars.lats[0], flight_vars.lats[1]])
-                ax.set_aspect('auto')
-                # Label the lat/lon axes with gridline values (lon on the
-                # bottom, lat on the left).
-                gl = ax.gridlines(draw_labels=True, linewidth=0.5,
-                                  color='grey', linestyle='--')
-                gl.top_labels = False
-                gl.right_labels = False
-                gl.xlabel_style = {'size': 8}
-                gl.ylabel_style = {'size': 8}
-            elif kind == 'pair':
-                # A parenthesised entry plots one variable against another
-                # (e.g. GGALT vs ATX/DPXC), so its x-axis is not time and gets
-                # no DateFormatter. May appear anywhere in VARLIST.
-                ax = fig.add_subplot(nrows, ncols, pos)
-                ax.grid(color='grey', linestyle='--', linewidth=0.5)
-            else:
-                # A plain variable is plotted against time.
-                ax = fig.add_subplot(nrows, ncols, pos)
-                ax.grid(color='grey', linestyle='--', linewidth=0.5)
-                ax.xaxis.set_major_formatter(DateFormatter('%H%M'))
-            return ax
-        for i, var in enumerate(VARLIST, start=1):
-            #rotation = 25 if i in [5, 6] else None
-            ax = create_subplot(fig, i, var)
-            fig.tight_layout()
-            axes.append(ax)
-            print(var)
-            if isinstance(var, tuple):
-                x1 = anim_file[var[0]]
-                y1 = anim_file[var[1]]
-                minx = np.nanmin(x1)
-                maxx = np.nanmax(x1)
-                miny = np.nanmin(y1)
-                maxy = np.nanmax(y1)
-                xlabel= var[0] + ' [' + anim_file[var[0]].units + ']'
-                point = ax.plot([], [], color=PointColor, marker='o', markeredgecolor='r')
-                line = ax.plot([], [], color=LineColor, label = var[1])
-                if len(var)>2:
-                    y2 = anim_file[var[2]]
-                    # Make sure that the plot fits both lines
-                    miny = np.nanmin(y1) if np.nanmin(y1) < np.nanmin(y2) else np.nanmin(y2)
-                    maxy = np.nanmax(y1) if np.nanmax(y1) > np.nanmax(y2) else np.nanmax(y2)
-                    line2 = ax.plot([], [], color=LineColor2, linewidth=2, label=var[2]) 
-                    point2 = ax.plot([], [], color=PointColor, marker='o', markeredgecolor='r') 
-                    ylabel=var[1] + ' '+var[2] +' [' + anim_file[var[1]].units + ']'
-                    y.append((y1, y2)) 
-                    lines.append([line, line2])
-                    points.append([point, point2])
-                    ax.set_xlim([minx, maxx])
-                    ax.set_ylim([miny, maxy])
-                    ax.set_xlabel(xlabel)
-                    ax.set_ylabel(ylabel)
-                    ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.2), ncol=2) 
-                else:
-                    ylabel=var[1] + ' [' + anim_file[var[1]].units + ']'
-                    y.append([y1])
-                    lines.append([line])
-                    points.append([point])
-                    if i != len(VARLIST):
-                        # Generic variable-vs-variable plot (not the lat/lon
-                        # map, whose extent is set by set_extent).
-                        ax.set_xlim([minx, maxx])
-                        ax.set_ylim([miny, maxy])
-                        ax.set_xlabel(xlabel)
-                        ax.set_ylabel(ylabel)
-                
-                ylabs.append(ylabel)
-                x.append(x1)
-                
-                xlims.append([minx, maxx])
-                ylims.append([miny, maxy])
-                if i <(sub_length+1):
-                    ax.xaxis.set_tick_params(labelbottom=False)
-            else:
-                y1 = anim_file[var]
-                print(y1)
-                time = pd.to_datetime(y1.Time.values)
-                miny = np.nanmin(y1)
-                maxy = np.nanmax(y1)
-                minx = np.nanmin(time)
-                maxx = np.nanmax(time)
-                xlabel= 'Time [Hour]' 
-                ylabel= var + ' [' + anim_file[var].units + ']'
-                line = ax.plot([], [], color=LineColor)
-                point = ax.plot([], [], color=PointColor, marker='o', markeredgecolor='r')
-                lines.append([line])
-                points.append([point])
-                x.append(time)
-                y.append([y1]) 
-                ylabs.append(ylabel)
-                xlabs.append(xlabel) 
-                xlims.append([minx, maxx])
-                ylims.append([miny, maxy])
-                if i <len(VARLIST)-2:
-                    ax.xaxis.set_tick_params(labelbottom=False)
-                ax.set_xlim([minx, maxx])
-                ax.set_ylim([miny, maxy])
-                ax.set_xlabel(xlabel)
-                ax.set_ylabel(ylabel) 
-            # The map (cartopy GeoAxes) draws its labels via the gridliner,
-            # not standard axis ticks; rotating its major tick labels raises a
-            # NaN error on newer matplotlib/cartopy, so only rotate plain axes.
-            if not hasattr(ax, 'projection'):
-                plt.setp(ax.xaxis.get_majorticklabels(), rotation=25)
-        def animate(i):
-            print(f'Animating frame {i}')
-            for line, point, x1, y1 in zip(lines, points, x, y):
-                for l in range(len(line)):
-                    line[l][0].set_data(x1[:i], y1[l][:i])
-                    point[l][0].set_data([x1[i]], [y1[l][i]])
-        
-        # In preview mode, render only the first frame to a PNG and skip the
-        # full mp4 encode, so the layout can be checked before a long run.
-        if preview:
-            animate(0)
-            preview_file = flight_vars.save_file.rsplit('.mp4', 1)[0] + \
-                           '_frame0.png'
-            fig.savefig(preview_file, dpi=dpi)
-            print('Saving preview frame ' + preview_file)
-            return
-
-        anim = animation.FuncAnimation(fig, animate, frames=len(x[0]),
-                                       blit = False) #,
-        anim.save(flight_vars.save_file, fps=fps, dpi=dpi)
-        print('Saving ' + flight_vars.save_file)
+@dataclass
+class RunContext:
+    '''Run-level values computed once in main() and shared, unchanged, by every
+    flight in the run. These were previously module globals; bundling them into
+    one object passed to setup_flight_vars and process_animation removes the
+    globals while keeping the per-run scope distinct from the per-flight
+    FlightContext.'''
+    project: str           # project name, e.g. "TI3GER-2"
+    dat: str               # flight data dir: $DATA_DIR/<project>
+    flight_movie_dir: str  # camera movies dir: $RAW_DATA_DIR/<project>/Movies/
+    output_dir: str        # output dir: $RAW_DATA_DIR/<project>/Animations/
 
 # Define function to check to make sure supplied vars are in the .nc file
 
@@ -240,25 +74,26 @@ def dir_check(directory):
             logging.error('Bailing out')
             exit(1)
 
-def process_animation(flight_vars, flight, render=True):
+def process_animation(flight_vars, flight, cfg, run, render=True):
     print('*******************************************')
     print('******   Starting flight animation   ******')
     print('*******************************************')
     print('Using flight data file: ' + flight_vars.flight_data)
 
     if render:
-        ani = SubplotAnimation(flight_vars)
+        animate.plot(flight_vars, cfg)
     elif not os.path.exists(flight_vars.save_file):
         print('Cannot combine: ' + flight_vars.save_file + ' does not exist. '
               'Run without --combine-only first to create the frames.')
         return
 
     # Use ffmpeg to align the duration based on number of frames and frame rates
-    # This will get the duration of the flight movie file and store as a variable
+    # This will get the duration of the flight movie file and store as a
+    # variable
     Duration1 = subprocess.check_output(
         ['ffprobe', '-v', 'error', '-show_entries', 'format=duration',
          '-of', 'default=noprint_wrappers=1:nokey=1',
-         flight_movie_dir + flight_vars.flight_movie])
+         run.flight_movie_dir + flight_vars.flight_movie])
     Duration1 = float(Duration1)
 
     # This sets frame rate for the animation file and store as a variable
@@ -270,20 +105,21 @@ def process_animation(flight_vars, flight, render=True):
     # Perform the calculation
     scalefactor = str(Duration1 / Duration2)
 
-    # Extract the hieght from the camera image .mp4 for use in the creation of the animations
+    # Extract the hieght from the camera image .mp4 for use in the creation of
+    # the animations
     height = subprocess.check_output(
         ['ffprobe', '-v', 'error', '-show_entries', 'stream=height',
-         '-of', 'csv=p=0:s=x', flight_movie_dir + flight_vars.flight_movie])
+         '-of', 'csv=p=0:s=x', run.flight_movie_dir + flight_vars.flight_movie])
     height = height.rstrip().decode('utf-8')
-    dims = width+height
+    dims = cfg.width+height
 
     # The ffmpeg intermediates and the final combined mp4 all live alongside
     # save_file in output_dir. Build the mid_/final_ names from the basename
     # so the prefix is not prepended to the directory path.
     base = os.path.basename(flight_vars.save_file)
-    mid_file = os.path.join(output_dir, 'mid_' + base)
-    final_file = os.path.join(output_dir, 'final_' + base)
-    output_file = os.path.join(output_dir, project + flight + '.mp4')
+    mid_file = os.path.join(run.output_dir, 'mid_' + base)
+    final_file = os.path.join(run.output_dir, 'final_' + base)
+    output_file = os.path.join(run.output_dir, run.project + flight + '.mp4')
 
     # Update duration of the animation mp4 to align with flight movie
     subprocess.run(['ffmpeg', '-i', flight_vars.save_file,
@@ -293,7 +129,7 @@ def process_animation(flight_vars, flight, render=True):
     subprocess.run(['ffmpeg', '-i', mid_file, '-s', dims,
                     '-c:a', 'copy', final_file], check=True)
 
-    subprocess.run(['ffmpeg', '-i', flight_movie_dir + flight_vars.flight_movie,
+    subprocess.run(['ffmpeg', '-i', run.flight_movie_dir + flight_vars.flight_movie,
                     '-i', final_file,
                     '-filter_complex', 'hstack,format=yuv420p',
                     '-c:v', 'libx264', '-crf', '18', output_file], check=True)
@@ -309,12 +145,14 @@ def get_flight_area(dataset):
     min_lon = dataset.attrs['geospatial_lon_min']
 
     # Return the latitude and longitude bounds
-    return (math.floor(min_lat), math.ceil(max_lat)), (math.floor(min_lon), math.ceil(max_lon))
+    return (math.floor(min_lat), math.ceil(max_lat)), \
+            (math.floor(min_lon), math.ceil(max_lon))
 
 def create_time_slice(filename):
     # Parse the start time
     filename = filename.rsplit('.mp4', 1)[0]
-    time_part = ''.join(filename.split('.', 1)[1:]) # This assumes the format is always as described
+    time_part = ''.join(filename.split('.', 1)[1:]) # This assumes the format
+                                                    # is always as described
     
     # Step 2: Split the time part into start and end times
     start_time_str, end_time_str = time_part.split('_')
@@ -324,7 +162,8 @@ def create_time_slice(filename):
     start_date_str = start_time.strftime('%y%m%d')
     
     # Combine the start date with the end time's time part
-    # Assuming end_time_str format is '%H:%M:%S' and needs to be combined with the start date
+    # Assuming end_time_str format is '%H:%M:%S' and needs to be combined with
+    # the start date
     end_time_full_str = f"{start_date_str}.{end_time_str}"
     
     # Parse the modified end time string
@@ -335,7 +174,7 @@ def create_time_slice(filename):
     
     return time_slice
 
-def setup_flight_vars(flight):
+def setup_flight_vars(flight, run):
     '''
     Gather the variables needed for plotting and animation for each flight
     and return them as a FlightContext. flight_data and save_file are always
@@ -346,20 +185,23 @@ def setup_flight_vars(flight):
     # PROJECT-SPECIFIC FIX
     # The TI3GER-2 data files drop the dash in their names (e.g. TI3GER2rf01.nc)
     # even though the project directory keeps it.
-    file_project = project.replace('-', '') if project == 'TI3GER-2' else project
+    file_project = run.project.replace('-', '') if run.project == 'TI3GER-2' else run.project
 
-    flight_data = f"{dat}/{file_project}{flight}.nc"
+    flight_data = f"{run.dat}/{file_project}{flight}.nc"
 
     anim_file = xr.open_dataset(flight_data)
     # Write all generated files (animation, preview image, ffmpeg
     # intermediates, final combined mp4) to output_dir.
-    save_file = os.path.join(output_dir, project + flight + 'animation.mp4')
+    save_file = os.path.join(run.output_dir, run.project + flight + 'animation.mp4')
 
     flight_vars = FlightContext(flight_data=flight_data, save_file=save_file)
-    for file in os.listdir(flight_movie_dir):
+    # lats/lons come from the data file's global attributes, not the camera
+    # movie. Set them unconditionally so can run in --preview mode and test
+    # plot layout when no movie is present.
+    flight_vars.lats, flight_vars.lons = get_flight_area(anim_file)
+    for file in os.listdir(run.flight_movie_dir):
         if fnmatch.fnmatch(file, '*' + flight + '*.mp4'):
             flight_vars.flight_movie = file
-            flight_vars.lats, flight_vars.lons = get_flight_area(anim_file)
             flight_vars.flight_time = create_time_slice(file)
     return flight_vars
 
@@ -385,92 +227,92 @@ def parse_args():
 
     return args
 
-def main():
-
-    # Process command line arguments.
-    args = parse_args()
-
-    # Set variables that used to be imported from animation_config as global
-    global project, flights, dat, flight_movie_dir, output_dir
-    global VARLIST, dpi, fps, LineColor, LineColor2, PointColor, width
+def setup_run_vars(args):
+    '''Validate the environment and gather the run-level values into a
+    RunContext. Mirrors setup_flight_vars: it computes the values shared by
+    every flight in the run (project name and the data/movie/output dirs)
+    and returns them as one object, so main() does not handle them piecemeal.
+    Exits if a required environment variable is missing.'''
 
     # Check for required environment variables. Exit if not found.
-    if 'DATA_DIR' not in os.environ:
-        print('DATA_DIR environment variable not set.')
-        exit(1)
-    if 'RAW_DATA_DIR' not in os.environ:
-        print('RAW_DATA_DIR environment variable not set.')
-        exit(1)
-    if 'PROJ_DIR' not in os.environ:
-        print('PROJ_DIR environment variable not set.')
-        exit(1)
+    for var in ('DATA_DIR', 'RAW_DATA_DIR', 'PROJ_DIR'):
+        if var not in os.environ:
+            print(var + ' environment variable not set.')
+            exit(1)
 
     # Determine project
     project = config_loader.resolve_project(args.project)
 
     # Build the paths to the data directories based on the environment variables
-    # - Build location of data
-    dat = os.path.join(os.environ['DATA_DIR'], project)
-    # - Define where the existing digital camera movies are located
-    flight_movie_dir = os.path.join(os.environ['RAW_DATA_DIR'], project, "Movies/")
-    # - Define where the output .mp4 files will be written
-    output_dir = os.path.join(os.environ['RAW_DATA_DIR'], project, "Animations/")
+    return RunContext(
+        project=project,
+        # - Location of the flight data
+        dat=os.path.join(os.environ['DATA_DIR'], project),
+        # - Where the existing digital camera movies are located
+        flight_movie_dir=os.path.join(os.environ['RAW_DATA_DIR'], project,
+                                      "Movies/"),
+        # - Where the output .mp4 files will be written
+        output_dir=os.path.join(os.environ['RAW_DATA_DIR'], project,
+                                "Animations/"),
+    )
+
+def main():
+
+    # Process command line arguments.
+    args = parse_args()
+
+    # Gather the run-level values (project + data/movie/output dirs) shared by
+    # every flight, instead of routing them through module globals.
+    run = setup_run_vars(args)
 
     # Read the configuration file. On the first run for a project (no config in
     # $PROJ_DIR/<project>/<platform>/scripts), copy the template there and stop
     # so template can be configured for the project.
-    config = config_loader.load(project)
-
-    # Bind the per-project settings from the loaded config
-    flights = config.flights
-    VARLIST = config.VARLIST
-    dpi = config.dpi
-    fps = config.fps
-    LineColor = config.LineColor
-    LineColor2 = config.LineColor2
-    PointColor = config.PointColor
-    width = config.width
+    cfg = config_loader.load(run.project)
 
     # Perform checks to see if dirs are already present, make them if not
-    dir_check(dat)
-    dir_check(flight_movie_dir)
-    dir_check(output_dir)
+    dir_check(run.dat)
+    dir_check(run.flight_movie_dir)
+    dir_check(run.output_dir)
 
-    for flight in flights:
-        flight_vars = setup_flight_vars(flight)
+    for flight in cfg.flights:
+        flight_vars = setup_flight_vars(flight, run)
 
         if args.preview:
             # Only create one frame then exit. Useful when determining if the
             # generated plots are correct.
-            SubplotAnimation(flight_vars, preview=True)
+            animate.plot(flight_vars, cfg, preview=True)
             continue
 
         # Read in the movie file created from CombineCameras.pl
-        if flight_vars.flight_movie is not None and os.path.exists(flight_movie_dir + flight_vars.flight_movie):
+        if flight_vars.flight_movie is not None and os.path.exists(run.flight_movie_dir + flight_vars.flight_movie):
 
-            process_animation(flight_vars, flight, render=not args.combine_only)
+            process_animation(flight_vars, flight, cfg, run,
+                              render=not args.combine_only)
 
-        # If the movie file doesn't exist, then see if the user wants to make it.
+        # If the movie file doesn't exist, then see if the user wants to make it
         else:
-            print('Could not find a camera images .mp4 file in: ' + flight_movie_dir + flight + '*')
-            print('Please download the .mp4 file from https://data.eol.ucar.edu/')
+            print('Could not find a camera images .mp4 file in: ' +
+                  run.flight_movie_dir + flight + '*')
+            print('Please download .mp4 file from https://data.eol.ucar.edu/')
             process = input('If you are at NCAR RAF and you would like to ' + \
                             'generate the camera images .mp4 file, press ' + \
                             'Enter. Anything else will not process.')
 
             if process == '':
-                proj_path = os.path.join(os.environ["PROJ_DIR"], project)
+                proj_path = os.path.join(os.environ["PROJ_DIR"], run.project)
                 # The platform (e.g. GV_N677F) is the directory component that
                 # sits under PROJ_DIR/project.
                 platform = find_platform(proj_path)
                 script = os.path.join(proj_path, platform, "scripts",
                                       "createMovies.sh")
-                command = [script,'-p',project,flight]
+                command = [script,'-p',run.project,flight]
                 print(command)
                 subprocess.run(command, check=True)
 
             elif process != '':
-                print('Please download the desired .mp4 camera images file and start again.')
+                print('Please download the desired .mp4 camera images file' +
+                      'and start again.')
                 exit(1)
 
 

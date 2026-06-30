@@ -1,12 +1,12 @@
 #! /usr/bin/env python3
 
 #######################################################################
-# Characterization ("golden master") tests for SubplotAnimation.
+# Characterization ("golden master") tests for animate.plot.
 #
-# SubplotAnimation.__init__ is nonstandard: it loads data, builds the
-# matplotlib figure, defines the create_subplot/animate closures, and
-# saves the mp4 all in one method. These tests pin down its *current*
-# observable behavior so a refactor can be confirmed not to change it.
+# animate.plot() loads data, builds the matplotlib figure, defines the
+# animate closure, and saves the mp4 (or a preview PNG) all in one call.
+# These tests pin down its *current* observable behavior so a refactor
+# can be confirmed not to change it.
 #
 # Unlike test_layout / test_paths / test_config_loader (which are
 # deliberately stdlib-only), these tests require the full graphics stack
@@ -15,11 +15,14 @@
 # still works in a bare environment.
 #
 # To make them hermetic the tests:
-#   * patch xr.open_dataset to return a small in-memory dataset
+#   * patch animate.xr.open_dataset to return a small in-memory dataset
 #     (no .nc file needed),
-#   * patch animation.FuncAnimation and Figure.savefig so no mp4 is
-#     encoded (no ffmpeg) and cartopy never draws (no shapefile
-#     download).
+#   * patch animate.animation.FuncAnimation and Figure.savefig so no mp4
+#     is encoded (no ffmpeg) and cartopy never draws to disk.
+#
+# The plotting configuration (VARLIST, colors, dpi, fps) is supplied via
+# a small cfg object, exactly as the real config_loader hands one to
+# plot(); the per-flight values come through a FlightContext.
 #
 # IMPORTANT: run this against the UNCHANGED code first and confirm it
 # passes. A golden-master test is only meaningful once it is green on
@@ -30,6 +33,7 @@
 #######################################################################
 
 import contextlib
+import types
 import unittest
 from unittest import mock
 
@@ -43,6 +47,7 @@ try:
     import xarray as xr
     import cartopy.crs as ccrs
     from cartopy.mpl.geoaxes import GeoAxes
+    import animate
     import timeseries_animation as ts
     HAVE_DEPS = True
     _IMPORT_ERR = None
@@ -60,7 +65,7 @@ except Exception as exc:          # pragma: no cover - depends on env
     _IMPORT_ERR = exc
 
 
-# A small VARLIST that exercises every branch of create_subplot / the
+# A small VARLIST that exercises every branch of _create_subplot / the
 # plotting loop exactly once:
 #   entry 1  "GGALT"                  -> 'time'  (plain variable vs time)
 #   entry 2  ("GGALT", "ATX")         -> 'pair'  (2-tuple, single line)
@@ -71,6 +76,13 @@ VARLIST = ["GGALT", ("GGALT", "ATX"), ("GGALT", "ATX", "DPXC"),
 LATS = (40, 44)
 LONS = (-105, -101)
 N_FRAMES = 5
+
+# Plotting config values plot() reads off the cfg object.
+LINE_COLOR = 'blue'
+LINE_COLOR2 = 'green'
+POINT_COLOR = 'red'
+DPI = 100
+FPS = 10
 
 
 def _build_dataset():
@@ -90,54 +102,59 @@ def _build_dataset():
     })
 
 
+def _build_cfg():
+    '''Stand-in for the object config_loader.load() hands to plot().'''
+    return types.SimpleNamespace(
+        VARLIST=VARLIST,
+        LineColor=LINE_COLOR, LineColor2=LINE_COLOR2, PointColor=POINT_COLOR,
+        dpi=DPI, fps=FPS,
+    )
+
+
 @unittest.skipUnless(HAVE_DEPS,
                      'graphics stack unavailable: %s' % (_IMPORT_ERR,))
 class SubplotAnimationCharacterizationTests(unittest.TestCase):
-    '''Drives SubplotAnimation.__init__ and inspects the figure it builds.'''
+    '''Drives animate.plot() and inspects the figure it builds.'''
 
     def setUp(self):
-        # SubplotAnimation reads these as module globals (main() sets them
-        # at runtime). Inject test values directly onto the module.
-        self._globals = {
-            'VARLIST': VARLIST,
-            'LineColor': 'blue', 'LineColor2': 'green', 'PointColor': 'red',
-            'dpi': 100, 'fps': 10,
-        }
-        self._patchers = [mock.patch.object(ts, name, value, create=True)
-                          for name, value in self._globals.items()]
-        for p in self._patchers:
-            p.start()
-        self.addCleanup(lambda: [p.stop() for p in self._patchers])
         self.dataset = _build_dataset()
+        self.cfg = _build_cfg()
 
-    def _flight_vars(self):
+    def _flight_vars(self, with_movie=True):
+        '''A FlightContext as setup_flight_vars would return it. With a movie,
+        flight_time is the slice spanning the data; without one (e.g. a
+        --preview run with no camera movie) flight_time is None but lats/lons
+        are still set from the data file.'''
         times = self.dataset.Time.values
         return ts.FlightContext(
             flight_data='dummy.nc',
             save_file='/tmp/out/PROJrf01animation.mp4',
-            flight_time=slice(times[0], times[-1]),
+            flight_time=slice(times[0], times[-1]) if with_movie else None,
             lats=LATS, lons=LONS,
         )
 
     @contextlib.contextmanager
-    def _run(self, preview):
-        '''Construct SubplotAnimation under the necessary patches and yield
+    def _run(self, preview, flight_vars=None):
+        '''Run animate.plot() under the necessary patches; yield
         (figure, FuncAnimation mock, savefig mock).'''
         created = {}
-        real_figure = ts.plt.figure
+        real_figure = plt.figure
 
         def capture_figure(*a, **k):
             fig = real_figure(*a, **k)
             created['fig'] = fig
             return fig
 
-        with mock.patch.object(ts.xr, 'open_dataset',
+        if flight_vars is None:
+            flight_vars = self._flight_vars()
+
+        with mock.patch.object(animate.xr, 'open_dataset',
                                return_value=self.dataset), \
-             mock.patch.object(ts.plt, 'figure',
+             mock.patch.object(animate.plt, 'figure',
                                side_effect=capture_figure), \
-             mock.patch.object(ts.animation, 'FuncAnimation') as func_anim, \
+             mock.patch.object(animate.animation, 'FuncAnimation') as func_anim, \
              mock.patch.object(Figure, 'savefig') as savefig:
-            ts.SubplotAnimation(self._flight_vars(), preview=preview)
+            animate.plot(flight_vars, self.cfg, preview=preview)
             try:
                 yield created['fig'], func_anim, savefig
             finally:
@@ -205,20 +222,19 @@ class SubplotAnimationCharacterizationTests(unittest.TestCase):
 
     def test_funcanimation_frame_count_and_save_call(self):
         fv = self._flight_vars()
-        with self._run(preview=False) as (fig, func_anim, _sf):
+        with self._run(preview=False, flight_vars=fv) as (fig, func_anim, _sf):
             func_anim.assert_called_once()
             _args, kwargs = func_anim.call_args
             self.assertEqual(kwargs['frames'], N_FRAMES)
             self.assertFalse(kwargs['blit'])
             func_anim.return_value.save.assert_called_once_with(
-                fv.save_file, fps=self._globals['fps'],
-                dpi=self._globals['dpi'])
+                fv.save_file, fps=FPS, dpi=DPI)
 
     def test_animate_sets_growing_line_and_current_point(self):
         with self._run(preview=False) as (fig, func_anim, _sf):
             # Recover the animate closure passed to FuncAnimation and drive it.
-            animate = func_anim.call_args.args[1]
-            animate(3)
+            animate_fn = func_anim.call_args.args[1]
+            animate_fn(3)
             ax = fig.axes[0]                       # "GGALT" vs time
             line, point = ax.get_lines()
             # The line shows samples [0:3]; the point marks sample 3.
@@ -237,7 +253,24 @@ class SubplotAnimationCharacterizationTests(unittest.TestCase):
             (path,), kwargs = savefig.call_args
             self.assertEqual(
                 path, '/tmp/out/PROJrf01animation_frame0.png')
-            self.assertEqual(kwargs['dpi'], self._globals['dpi'])
+            self.assertEqual(kwargs['dpi'], DPI)
+
+    def test_preview_without_movie_plots_full_flight(self):
+        '''A --preview run with no matching camera movie has flight_time=None
+        (but lats/lons are still set from the data file). plot() must skip the
+        time selection and render the whole flight instead of crashing. Guards
+        the fixes for the None time-slice and the unset map extent.'''
+        fv = self._flight_vars(with_movie=False)
+        with self._run(preview=True, flight_vars=fv) as (fig, func_anim, savefig):
+            func_anim.assert_not_called()
+            savefig.assert_called_once()
+            # Still builds every subplot, including the map with its extent.
+            self.assertEqual(len(fig.axes), len(VARLIST))
+            map_ax = fig.axes[3]
+            self.assertIsInstance(map_ax, GeoAxes)
+            x0, x1, y0, y1 = map_ax.get_extent(ccrs.PlateCarree())
+            self.assertAlmostEqual(x0, LONS[0], delta=1.0)
+            self.assertAlmostEqual(y1, LATS[1], delta=1.0)
 
 
 if __name__ == '__main__':
