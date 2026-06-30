@@ -10,6 +10,8 @@
 # Run with:  python3 -m unittest test_paths
 #######################################################################
 
+import contextlib
+import io
 import os
 import tempfile
 import unittest
@@ -66,14 +68,18 @@ class FindPlatformTests(unittest.TestCase):
         self._make_platform("GV_N677F")
         self._make_platform("C130_N130AR")
         # Candidates are listed sorted: 1=C130_N130AR, 2=GV_N677F.
-        with mock.patch("builtins.input", return_value="2"):
+        # redirect_stdout swallows the prompt text so it does not leak into the
+        # test runner output (where it reads like an interactive hang).
+        with mock.patch("builtins.input", return_value="2"), \
+             contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(find_platform(self.proj_path), "GV_N677F")
 
     def test_multiple_platforms_reprompts_on_invalid_input(self):
         self._make_platform("GV_N677F")
         self._make_platform("C130_N130AR")
         # Non-numeric, out-of-range, then a valid choice (1=C130_N130AR).
-        with mock.patch("builtins.input", side_effect=["x", "0", "9", "1"]):
+        with mock.patch("builtins.input", side_effect=["x", "0", "9", "1"]), \
+             contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(find_platform(self.proj_path), "C130_N130AR")
 
     def test_single_platform_does_not_prompt(self):
