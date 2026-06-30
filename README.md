@@ -4,11 +4,29 @@
 
 
 ## Required packages
+
+The code needs Python 3, FFmpeg (`ffmpeg` + `ffprobe`), and the Python packages
+numpy, matplotlib, xarray, netcdf4, pandas, and cartopy. `netcdf4` is the xarray
+backend that reads the `.nc` flight data files — without it xarray raises
+`ValueError: found the following matches ... but their dependencies may not be
+installed`.
+
+### AlmaLinux 9 (EOL servers)
 ```
 dnf install python3
 dnf install ffmpeg
 dnf install ffprobe
-pip install numpy matplotlib xarray pandas cartopy
+pip install numpy matplotlib xarray netcdf4 pandas cartopy
+```
+
+### macOS
+On a Mac, install FFmpeg with Homebrew and the Python stack with conda from the
+`environment.yml` shipped with the repo (conda-forge ships cartopy with its
+native GEOS/PROJ/shapely dependencies, which plain `pip` does not):
+```
+brew install ffmpeg            # also provides ffprobe
+conda env create -f environment.yml
+conda activate animation
 ```
 ## Summary
 
@@ -49,5 +67,13 @@ python3 -m unittest test_paths -v
 python3 -m unittest test_config_loader -v
 ```
 
-### To run tests of subplotAnimation (useful for confirming refactor doesn't break anything)
-conda run -n animation-test python -m unittest test_subplot_animation -v
+### To run golden-master tests of animate.plot (the figure/animation builder)
+### (useful for confirming refactor doesn't break anything)
+First time,
+```
+conda env create -f environment.yml
+```
+Then just run:
+```
+conda run -n animation python -m unittest test_subplot_animation -v
+```
