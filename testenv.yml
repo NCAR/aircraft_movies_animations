@@ -1,0 +1,28 @@
+# Conda environment for the SubplotAnimation characterization tests
+# (test_subplot_animation.py), which need the full graphics stack.
+# The stdlib-only suites (test_layout / test_paths / test_config_loader)
+# do not need any of this.
+#
+# Create and activate:
+#   conda env create -f testenv.yml
+#   conda activate animation-test
+#   python -m unittest test_subplot_animation -v
+#
+# Update after editing this file:
+#   conda env update -f testenv.yml --prune
+#
+# Remove:
+#   conda env remove -n animation-test
+#
+# Python 3.13 (not 3.14): cartopy has no 3.14 build yet. conda-forge
+# provides cartopy with its native GEOS/PROJ/shapely deps.
+name: animation-test
+channels:
+  - conda-forge
+dependencies:
+  - python=3.13
+  - matplotlib
+  - cartopy
+  - xarray
+  - pandas
+  - numpy

@@ -48,3 +48,6 @@ python3 -m unittest test_layout -v
 python3 -m unittest test_paths -v
 python3 -m unittest test_config_loader -v
 ```
+
+### To run tests of subplotAnimation (useful for confirming refactor doesn't break anything)
+conda run -n animation-test python -m unittest test_subplot_animation -v
