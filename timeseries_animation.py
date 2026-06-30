@@ -200,7 +200,11 @@ class SubplotAnimation(animation.TimedAnimation):
                 ax.set_ylim([miny, maxy])
                 ax.set_xlabel(xlabel)
                 ax.set_ylabel(ylabel) 
-            plt.setp(ax.xaxis.get_majorticklabels(), rotation=25)
+            # The map (cartopy GeoAxes) draws its labels via the gridliner,
+            # not standard axis ticks; rotating its major tick labels raises a
+            # NaN error on newer matplotlib/cartopy, so only rotate plain axes.
+            if not hasattr(ax, 'projection'):
+                plt.setp(ax.xaxis.get_majorticklabels(), rotation=25)
         def animate(i):
             print(f'Animating frame {i}')
             for line, point, x1, y1 in zip(lines, points, x, y):
