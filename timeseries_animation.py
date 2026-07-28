@@ -137,6 +137,58 @@ def process_animation(flight_vars, flight, cfg, run, render=True):
     os.remove(mid_file)
     os.remove(final_file)
 
+def movie_exists(flight_vars, run):
+    '''True if setup_flight_vars matched a camera movie for the flight and that
+    movie is present on disk.'''
+
+    return (flight_vars.flight_movie is not None
+            and os.path.exists(run.flight_movie_dir + flight_vars.flight_movie))
+
+def create_movie(flight, run):
+    '''Offer to build the missing camera images .mp4 by running createMovies.sh.
+
+    createMovies.sh (and the combineCameras.pl it calls) runs in the
+    foreground, so subprocess.run blocks until the movie has been written and
+    control returns here. Returns True if the script ran to completion, False
+    if it failed.
+
+    The exit status is not on its own proof that a movie was made:
+    createMovies.sh exits 0 when it skips a flight that has no camera images,
+    when the user answers 'n' to its combineCameras.pl prompt, and it does not
+    check combineCameras.pl's own status. The caller must therefore confirm by
+    re-scanning flight_movie_dir rather than trusting a True return.
+    '''
+
+    print('Could not find a camera images .mp4 file in: ' +
+          run.flight_movie_dir + flight + '*')
+    print('Please download .mp4 file from https://data.eol.ucar.edu/')
+    process = input('If you are at NCAR RAF and you would like to ' + \
+                    'generate the camera images .mp4 file, press ' + \
+                    'Enter. Anything else will not process.')
+
+    if process != '':
+        print('Please download the desired .mp4 camera images file' +
+              'and start again.')
+        exit(1)
+
+    proj_path = os.path.join(os.environ["PROJ_DIR"], run.project)
+    # The platform (e.g. GV_N677F) is the directory component that
+    # sits under PROJ_DIR/project.
+    platform = find_platform(proj_path)
+    script = os.path.join(proj_path, platform, "scripts",
+                          "createMovies.sh")
+    command = [script,'-p',run.project,flight]
+    print(command)
+    try:
+        subprocess.run(command, check=True)
+    except (subprocess.CalledProcessError, OSError) as err:
+        # Report and let the caller move on to the next flight instead of
+        # aborting the whole run.
+        logging.error('createMovies.sh failed: %s', err)
+        return False
+
+    return True
+
 def get_flight_area(dataset):
         # Assuming 'dataset' is an xarray Dataset with the required attributes
     max_lat = dataset.attrs['geospatial_lat_max']
@@ -295,36 +347,27 @@ def main():
             animate.plot(flight_vars, cfg, preview=True)
             continue
 
-        # Read in the movie file created from CombineCameras.pl
-        if flight_vars.flight_movie is not None and os.path.exists(run.flight_movie_dir + flight_vars.flight_movie):
+        # Read in the movie file created from CombineCameras.pl. If it doesn't
+        # exist, see if the user wants to make it, then pick the flight back up
+        # where it left off rather than dropping it.
+        if not movie_exists(flight_vars, run):
+            if not create_movie(flight, run):
+                continue
 
-            process_animation(flight_vars, flight, cfg, run,
-                              render=not args.combine_only)
+            # createMovies.sh writes the new movie into flight_movie_dir, so
+            # rerun the discovery to pick up its filename and the time span
+            # encoded in that name. This is also the check that a movie was
+            # actually produced, since createMovies.sh can exit 0 having
+            # skipped the flight.
+            flight_vars = setup_flight_vars(flight, run)
+            if not movie_exists(flight_vars, run):
+                print('createMovies.sh did not produce a camera images .mp4 '
+                      'file in: ' + run.flight_movie_dir + flight + '*')
+                print('Skipping animation for flight ' + flight)
+                continue
 
-        # If the movie file doesn't exist, then see if the user wants to make it
-        else:
-            print('Could not find a camera images .mp4 file in: ' +
-                  run.flight_movie_dir + flight + '*')
-            print('Please download .mp4 file from https://data.eol.ucar.edu/')
-            process = input('If you are at NCAR RAF and you would like to ' + \
-                            'generate the camera images .mp4 file, press ' + \
-                            'Enter. Anything else will not process.')
-
-            if process == '':
-                proj_path = os.path.join(os.environ["PROJ_DIR"], run.project)
-                # The platform (e.g. GV_N677F) is the directory component that
-                # sits under PROJ_DIR/project.
-                platform = find_platform(proj_path)
-                script = os.path.join(proj_path, platform, "scripts",
-                                      "createMovies.sh")
-                command = [script,'-p',run.project,flight]
-                print(command)
-                subprocess.run(command, check=True)
-
-            elif process != '':
-                print('Please download the desired .mp4 camera images file' +
-                      'and start again.')
-                exit(1)
+        process_animation(flight_vars, flight, cfg, run,
+                          render=not args.combine_only)
 
 
 if __name__ == '__main__':
