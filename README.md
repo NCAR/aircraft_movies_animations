@@ -55,6 +55,12 @@ without matplotlib, cartopy, or any data files:
 - `test_paths.py` (with `paths.py`) verifies that the platform directory under
   `PROJ_DIR/project` is parsed correctly, including with extra files, oddly
   named entries, and multiple directories (which prompt for a selection).
+- `test_timeseries_animation.py` verifies the `-f/--flight` option: that it is
+  parsed, that a `--flight` argument supersedes the `flights` list in
+  `animation_config.py` (the per-flight case called from `push_data.py`), and
+  that omitting it processes every flight in the config. It imports
+  `timeseries_animation`, so it is skipped unless the conda environment below
+  is used.
 
 Run all tests from the repo root with:
 ```
@@ -65,6 +71,7 @@ Or run a single suite, optionally with `-v` for per-test output:
 python3 -m unittest test_layout -v
 python3 -m unittest test_paths -v
 python3 -m unittest test_config_loader -v
+python3 -m unittest test_timeseries_animation -v
 ```
 
 ### To run golden-master tests of animate.plot (the figure/animation builder)

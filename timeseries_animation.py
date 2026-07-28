@@ -215,6 +215,12 @@ def parse_args():
                              '$PROJECT environment variable. On the first run '
                              'for a project the config template is copied into '
                              'the project scripts dir for you to edit.')
+    parser.add_argument('-f', '--flight',
+                        help='Single flight (e.g. rf01) to process, replacing '
+                             'the flights list in animation_config.py. Intended '
+                             'for per-flight runs called from push_data.py. To '
+                             'process several flights at once, list them in the '
+                             'config instead.')
     parser.add_argument('--preview', action='store_true',
                         help='Render only the first frame of each flight to a '
                              'PNG and skip the mp4 encode, to check the layout.')
@@ -275,7 +281,12 @@ def main():
     dir_check(run.flight_movie_dir)
     dir_check(run.output_dir)
 
-    for flight in cfg.flights:
+    # A --flight argument supersedes the flights list in animation_config.py.
+    # It processes a single flight (per-flight runs from push_data.py); leave it
+    # off to process every flight listed in the config.
+    flights = [args.flight] if args.flight else cfg.flights
+
+    for flight in flights:
         flight_vars = setup_flight_vars(flight, run)
 
         if args.preview:

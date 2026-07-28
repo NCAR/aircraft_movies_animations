@@ -8,7 +8,11 @@ import os
 
 ### Configuration is for project <project> ###
 
-# Provide flight: flights must be a list even if only processing one flight
+# Provide flight: flights must be a list even if only processing one flight.
+# During a deployment this can be left as "rfxx": push_data.py calls
+# timeseries_animation.py --flight <flight>, and that argument supersedes this
+# list. Only edit this list to process several flights in bulk (e.g.
+# post-deployment), which is not the usual deployment case.
 flights = ["rfxx"]
 
 # Plots are generated one plot per value in varlist

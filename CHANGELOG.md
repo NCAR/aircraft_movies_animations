@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Copy animation_config.py to $PROJ_DIR/<project>/<platform>/scripts on first
   run and subsequently read it from there. This allows the config to be saved
   with the project for documentation purposes and easy reuse.
+- `-f/--flight` command line option to process a single flight, superseding the
+  `flights` list in animation_config.py, for per-flight runs called from
+  push_data.py. `test_timeseries_animation.py` unit tests cover the option
+  parsing and the flight selection with and without the argument.
 - `--combine-only` command line option to rerun the ffmpeg combine steps and
   reuse the existing animation `.mp4` without regenerating frames.
 - `--preview` command line option to render only the first frame of each flight
@@ -39,6 +43,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   including pairing two variables in a single plot.
 - Documented required packages and added a "Running tests" section in the
   README.
+- Documented in animation_config.py that `flights` can be left at `rfxx` during
+  a deployment, since `--flight` supersedes it, and is only edited to process
+  several flights in bulk.
 
 ### Fixed
 - flight_time is only set when a matching camera movie is found. In
