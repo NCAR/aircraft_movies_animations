@@ -145,46 +145,49 @@ def movie_exists(flight_vars, run):
             and os.path.exists(run.flight_movie_dir + flight_vars.flight_movie))
 
 def create_movie(flight, run):
-    '''Offer to build the missing camera images .mp4 by running createMovies.sh.
+    '''Build the missing camera images .mp4 by running createMovies.sh.
+
+    Runs unattended: rather than asking the user whether they are at NCAR RAF,
+    just try to run the project's createMovies.sh and let it report its own
+    problems. Nothing it needs (the camera scripts, the parameter file
+    template, the flight's camera images, ffmpeg) is checked here, so there is
+    no second copy of createMovies.sh's and combineCameras.pl's requirements to
+    drift out of step with them. Its own 'Run combineCameras.pl?' prompt is
+    answered on stdin. Returns True if the script ran to completion, False if
+    it could not be run or failed.
 
     createMovies.sh (and the combineCameras.pl it calls) runs in the
     foreground, so subprocess.run blocks until the movie has been written and
-    control returns here. Returns True if the script ran to completion, False
-    if it failed.
-
-    The exit status is not on its own proof that a movie was made:
-    createMovies.sh exits 0 when it skips a flight that has no camera images,
-    when the user answers 'n' to its combineCameras.pl prompt, and it does not
-    check combineCameras.pl's own status. The caller must therefore confirm by
-    re-scanning flight_movie_dir rather than trusting a True return.
+    control returns here. A True return is still not proof that a movie was
+    made, though: createMovies.sh exits 0 when it skips a flight whose camera
+    images it cannot use, and it does not check combineCameras.pl's own exit
+    status. The caller must confirm by re-scanning flight_movie_dir.
     '''
 
     print('Could not find a camera images .mp4 file in: ' +
           run.flight_movie_dir + flight + '*')
-    print('Please download .mp4 file from https://data.eol.ucar.edu/')
-    process = input('If you are at NCAR RAF and you would like to ' + \
-                    'generate the camera images .mp4 file, press ' + \
-                    'Enter. Anything else will not process.')
+    print('Trying to create it with createMovies.sh.')
 
-    if process != '':
-        print('Please download the desired .mp4 camera images file' +
-              'and start again.')
-        exit(1)
-
-    proj_path = os.path.join(os.environ["PROJ_DIR"], run.project)
-    # The platform (e.g. GV_N677F) is the directory component that
-    # sits under PROJ_DIR/project.
-    platform = find_platform(proj_path)
-    script = os.path.join(proj_path, platform, "scripts",
-                          "createMovies.sh")
-    command = [script,'-p',run.project,flight]
-    print(command)
     try:
-        subprocess.run(command, check=True)
+        proj_path = os.path.join(os.environ['PROJ_DIR'], run.project)
+        # The platform (e.g. GV_N677F) is the directory component that
+        # sits under PROJ_DIR/project.
+        platform = find_platform(proj_path)
+        command = [os.path.join(proj_path, platform, 'scripts',
+                                'createMovies.sh'),
+                   '-p', run.project, flight]
+        print(command)
+        # createMovies.sh asks whether to run combineCameras.pl for the flight.
+        # Answer it here so the run does not stop for input; combineCameras.pl
+        # itself reads nothing from stdin.
+        subprocess.run(command, input='y\n', text=True, check=True)
     except (subprocess.CalledProcessError, OSError) as err:
         # Report and let the caller move on to the next flight instead of
-        # aborting the whole run.
-        logging.error('createMovies.sh failed: %s', err)
+        # aborting the whole run. This covers not being at NCAR RAF at all,
+        # where the project dir or the script itself is absent.
+        logging.error('Could not create the camera images .mp4: %s', err)
+        print('Please download .mp4 file from https://data.eol.ucar.edu/ '
+              'and start again.')
         return False
 
     return True
@@ -348,7 +351,7 @@ def main():
             continue
 
         # Read in the movie file created from CombineCameras.pl. If it doesn't
-        # exist, see if the user wants to make it, then pick the flight back up
+        # exist, make it where that is possible, then pick the flight back up
         # where it left off rather than dropping it.
         if not movie_exists(flight_vars, run):
             if not create_movie(flight, run):
