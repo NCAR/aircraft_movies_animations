@@ -32,6 +32,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic detection of flight area and time, and a plot legend.
 
 ### Changed
+- Camera movie creation now runs unattended. Instead of asking whether the user
+  is at NCAR RAF, run the project's `createMovies.sh` and answer its
+  `combineCameras.pl` prompt. What that script and `combineCameras.pl` need
+  (the camera scripts, the parameter file template, the flight's camera images,
+  ffmpeg) is deliberately not checked up front, so there is no second copy of
+  their requirements here to drift out of step with them; if a prerequisite is
+  missing they report it themselves and the flight is skipped with a pointer to
+  https://data.eol.ucar.edu/.
+- After `createMovies.sh` returns, confirm a camera movie is present in
+  `flight_movie_dir` before animating, since the script exits 0 even when it
+  skips a flight, then pick that flight back up rather than dropping it.
 - Moved content of SubplotAnimation class to animate.py and got rid of
   the vestigial class that inherited, but did not use, animation.TimedAnimation
   Refactored logical code blocks into functions
