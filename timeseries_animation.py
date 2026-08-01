@@ -26,7 +26,7 @@ import subprocess
 import logging
 import cartopy.feature as cf
 import cartopy.crs as ccrs
-from datetime import datetime
+from datetime import datetime, timedelta
 import re
 
 # Class to hold configuration so we don't need global vars and dependencies
@@ -223,7 +223,13 @@ def create_time_slice(filename):
     
     # Parse the modified end time string
     end_time = datetime.strptime(end_time_full_str, '%y%m%d.%H%M%S')
-    
+
+    # Only the start date is in the movie filename, so a flight that
+    # crosses UTC midnight puts the end time on the start date, i.e. before
+    # the start. Fix.
+    if end_time < start_time:
+        end_time += timedelta(days=1)
+
     # Format the times as a slice
     time_slice = slice(start_time, end_time)
     
@@ -235,6 +241,10 @@ def setup_flight_vars(flight, run):
     and return them as a FlightContext. flight_data and save_file are always
     set; the movie-dependent fields are filled in only if a camera movie
     matching the flight is found.
+
+    Returns None if the flight's NetCDF file is missing, can't be read, or has
+    no data, so can move on to the next flight rather than the whole run dying
+    on a traceback.
     '''
 
     # PROJECT-SPECIFIC FIX
@@ -244,7 +254,18 @@ def setup_flight_vars(flight, run):
 
     flight_data = f"{run.dat}/{file_project}{flight}.nc"
 
-    anim_file = xr.open_dataset(flight_data)
+    try:
+        anim_file = xr.open_dataset(flight_data)
+    except (OSError, ValueError) as err:
+        # OSError covers the file being absent or unreadable; xarray raises
+        # ValueError for a file that exists but isn't netCDF.
+        message = ('No usable flight data file for ' + flight + ': ' +
+                   flight_data)
+        print(message)
+        print('  ' + str(err))
+        print('Skipping flight ' + flight + '.')
+        logging.error('%s: %s', message, err)
+        return None
     # Write all generated files (animation, preview image, ffmpeg
     # intermediates, final combined mp4) to output_dir.
     save_file = os.path.join(run.output_dir, run.project + flight + 'animation.mp4')
@@ -343,6 +364,10 @@ def main():
 
     for flight in flights:
         flight_vars = setup_flight_vars(flight, run)
+        if flight_vars is None:
+            # No data file for this flight. Already reported, so carry on with
+            # any remaining flights.
+            continue
 
         if args.preview:
             # Only create one frame then exit. Useful when determining if the
@@ -363,6 +388,8 @@ def main():
             # actually produced, since createMovies.sh can exit 0 having
             # skipped the flight.
             flight_vars = setup_flight_vars(flight, run)
+            if flight_vars is None:
+                continue
             if not movie_exists(flight_vars, run):
                 print('createMovies.sh did not produce a camera images .mp4 '
                       'file in: ' + run.flight_movie_dir + flight + '*')
