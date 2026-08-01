@@ -27,6 +27,7 @@ import logging
 import cartopy.feature as cf
 import cartopy.crs as ccrs
 from datetime import datetime, timedelta
+import difflib
 import re
 
 # Class to hold configuration so we don't need global vars and dependencies
@@ -60,8 +61,6 @@ class RunContext:
     dat: str               # flight data dir: $DATA_DIR/<project>
     flight_movie_dir: str  # camera movies dir: $RAW_DATA_DIR/<project>/Movies/
     output_dir: str        # output dir: $RAW_DATA_DIR/<project>/Animations/
-
-# Define function to check to make sure supplied vars are in the .nc file
 
 def dir_check(directory):
 
@@ -235,7 +234,28 @@ def create_time_slice(filename):
     
     return time_slice
 
-def setup_flight_vars(flight, run):
+def check_vars(anim_file, cfg):
+    '''Confirm every variable named in the config's VARLIST is present in the
+    flight data file.
+
+    Tuple entries in the config's CARLIST name two or three variables (a
+    var-vs-var plot, and the trailing lat/lon map), so they are flattened out
+    and every name is checked.
+
+    Returns a list of (name, close_matches) for the names that are missing, in
+    VARLIST order and without repeats; an empty list if they are all present.
+    '''
+
+    wanted = []
+    for entry in cfg.VARLIST:
+        wanted.extend(entry if isinstance(entry, tuple) else [entry])
+
+    available = list(anim_file.variables)
+    return [(name, difflib.get_close_matches(name, available, n=3))
+            for name in dict.fromkeys(wanted)     # dedupe, keep VARLIST order
+            if name not in available]
+
+def setup_flight_vars(flight, run, cfg):
     '''
     Gather the variables needed for plotting and animation for each flight
     and return them as a FlightContext. flight_data and save_file are always
@@ -245,6 +265,10 @@ def setup_flight_vars(flight, run):
     Returns None if the flight's NetCDF file is missing, can't be read, or has
     no data, so can move on to the next flight rather than the whole run dying
     on a traceback.
+
+    Exits, rather than skipping the flight, if the config asks for a variable
+    the data file doesn't have: every flight in the project is plotted from the
+    same VARLIST, so the rest of the flight list would fail identically.
     '''
 
     # PROJECT-SPECIFIC FIX
@@ -266,6 +290,24 @@ def setup_flight_vars(flight, run):
         print('Skipping flight ' + flight + '.')
         logging.error('%s: %s', message, err)
         return None
+
+    # Every subplot is built from VARLIST, and the grid is sized and positioned
+    # from its length, so a name that isn't in the data file can't just be
+    # dropped - that would leave an empty panel and put the remaining plots out
+    # of step with their axes. Report all the bad names at once and stop.
+    missing = check_vars(anim_file, cfg)
+    if missing:
+        print('VARLIST in the project config names variables that are not in '
+              + flight_data + ':')
+        for name, suggestions in missing:
+            hint = '  (did you mean ' + ', '.join(suggestions) + '?)' \
+                if suggestions else ''
+            print('    ' + name + hint)
+        print('Fix VARLIST in the project config, then rerun.')
+        logging.error('VARLIST names missing from %s: %s', flight_data,
+                      ', '.join(name for name, _ in missing))
+        exit(1)
+
     # Write all generated files (animation, preview image, ffmpeg
     # intermediates, final combined mp4) to output_dir.
     save_file = os.path.join(run.output_dir, run.project + flight + 'animation.mp4')
@@ -363,7 +405,7 @@ def main():
     flights = [args.flight] if args.flight else cfg.flights
 
     for flight in flights:
-        flight_vars = setup_flight_vars(flight, run)
+        flight_vars = setup_flight_vars(flight, run, cfg)
         if flight_vars is None:
             # No data file for this flight. Already reported, so carry on with
             # any remaining flights.
@@ -387,7 +429,7 @@ def main():
             # encoded in that name. This is also the check that a movie was
             # actually produced, since createMovies.sh can exit 0 having
             # skipped the flight.
-            flight_vars = setup_flight_vars(flight, run)
+            flight_vars = setup_flight_vars(flight, run, cfg)
             if flight_vars is None:
                 continue
             if not movie_exists(flight_vars, run):
