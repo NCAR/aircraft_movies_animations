@@ -8,6 +8,13 @@
 # Plots are generated one plot per value in VARLIST
 ##############################################################################
 from functools import partial
+import matplotlib
+# The animations are written to .mp4 files and never displayed, so force the
+# non-interactive backend before anything imports pyplot. Otherwise pyplot
+# picks an interactive backend, and if DISPLAY points at an X11 forward that
+# isn't answering, creating the first figure blocks forever with no
+# error message. This has to stay above the cartopy and pyplot imports.
+matplotlib.use("Agg")
 import cartopy.crs as ccrs
 import cartopy.feature as cf
 import numpy as np
