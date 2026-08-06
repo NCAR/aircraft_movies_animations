@@ -104,7 +104,7 @@ def process_animation(flight_vars, flight, cfg, run, render=True):
     # Perform the calculation
     scalefactor = str(Duration1 / Duration2)
 
-    # Extract the hieght from the camera image .mp4 for use in the creation of
+    # Extract the height from the camera image .mp4 for use in the creation of
     # the animations
     height = subprocess.check_output(
         ['ffprobe', '-v', 'error', '-show_entries', 'stream=height',
