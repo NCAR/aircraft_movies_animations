@@ -179,17 +179,9 @@ def plot(flight_vars, cfg, preview=False):
     if flight_vars.flight_time is not None:
         anim_file = anim_file.sel(Time=flight_vars.flight_time)
 
-    for i, var in enumerate(cfg.VARLIST, start=1):
-        #rotation = 25 if i in [5, 6] else None
+    def build_panel(i, var):
+        '''Create and populate the sub-panel for one VARLIST entry.'''
         ax =_create_subplot(fig, i, var, cfg.VARLIST, flight_vars)
-        # Newer matplotlib's tight_layout returns NaN axes positions once a
-        # cartopy GeoAxes (the map) is in the figure, which later crashes
-        # the draw with "cannot convert float NaN to integer". The map
-        # always occupies a fixed grid cell (the last entry), so skip the
-        # re-tighten for it; the earlier plain-axes passes have already
-        # arranged the grid.
-        if not hasattr(ax, 'projection'):
-            fig.tight_layout()
         print("**************************************************")
         print(var)
         if isinstance(var, tuple):
@@ -204,6 +196,29 @@ def plot(flight_vars, cfg, preview=False):
         # NaN error on newer matplotlib/cartopy, so only rotate plain axes.
         if not hasattr(ax, 'projection'):
             plt.setp(ax.xaxis.get_majorticklabels(), rotation=25)
+
+    # The trailing lat/lon map is a cartopy GeoAxes, and its labelled
+    # gridlines report an infinite tight bounding box. Once it is in the
+    # figure, tight_layout hands back NaN positions for *every* panel, which
+    # later crashes the draw with "cannot convert float NaN to integer". So
+    # build the plain panels first and size the grid once, while every axis
+    # label and rotated tick label is already in place -- otherwise the
+    # bottom row is laid out before it has its labels and the x-axis label of
+    # the bottom-left panel falls off the canvas. The map is added afterwards
+    # and takes the bottom-right cell of the same grid, so tightening without
+    # it does not move it.
+    n_vars = len(cfg.VARLIST)
+    deferred = []
+    for i, var in enumerate(cfg.VARLIST, start=1):
+        if classify_entry(i, n_vars, var) == 'map':
+            deferred.append((i, var))
+            continue
+        build_panel(i, var)
+
+    fig.tight_layout()
+
+    for i, var in deferred:
+        build_panel(i, var)
 
     # In preview mode, render only the first frame to a PNG and skip the
     # full mp4 encode, so the layout can be checked before a long run.

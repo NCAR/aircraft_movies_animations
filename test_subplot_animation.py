@@ -272,6 +272,45 @@ class SubplotAnimationCharacterizationTests(unittest.TestCase):
             self.assertAlmostEqual(x0, LONS[0], delta=1.0)
             self.assertAlmostEqual(y1, LATS[1], delta=1.0)
 
+    # ---- label clipping ---------------------------------------------------
+
+    def test_bottom_row_labels_fit_inside_the_canvas(self):
+        '''Nothing a panel draws may fall outside the figure.
+
+        The grid has to be tightened after every axis label and rotated tick
+        label is in place. When it was tightened too early the bottom-left
+        panel's x-axis label ended up below the bottom edge of the canvas and
+        was silently cropped out of the animation.
+
+        Uses an 8-entry VARLIST so a labelled var-vs-var panel lands in the
+        bottom-left cell; the module-level 4-entry VARLIST puts the map
+        alongside the only bottom-row panel, so it never exercised this.
+        '''
+        self.cfg.VARLIST = ['GGALT', 'ATX', 'DPXC', 'GGALT', 'ATX', 'DPXC',
+                            ('GGALT', 'ATX'), ('GGLON', 'GGLAT')]
+        with self._run(preview=False) as (fig, _fa, _sf):
+            bottom_left = fig.axes[6]
+            # The panel is labelled at all (guards against the label being
+            # dropped rather than merely clipped).
+            self.assertEqual(bottom_left.get_xlabel(), 'GGALT [m]')
+
+            renderer = fig.canvas.get_renderer()
+            to_figure = fig.transFigure.inverted()
+            for i, ax in enumerate(fig.axes, start=1):
+                if isinstance(ax, GeoAxes):
+                    # A cartopy GeoAxes reports an infinite tight bbox (its
+                    # gridliner), so it cannot be measured this way.
+                    continue
+                bbox = ax.get_tightbbox(renderer).transformed(to_figure)
+                self.assertGreaterEqual(
+                    bbox.y0, 0,
+                    'panel %d is cropped off the bottom of the figure '
+                    '(tight bbox y0=%.4f)' % (i, bbox.y0))
+                self.assertLessEqual(
+                    bbox.y1, 1,
+                    'panel %d is cropped off the top of the figure '
+                    '(tight bbox y1=%.4f)' % (i, bbox.y1))
+
 
 if __name__ == '__main__':
     unittest.main()

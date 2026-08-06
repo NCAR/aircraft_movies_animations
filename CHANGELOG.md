@@ -65,8 +65,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - lats/lons come from the data file's global attributes, not the camera
   movie. Set them unconditionally so can run in --preview mode and test
   plot layout when no movie is present.
-- For GGLON/GGLAT plot, skip tightening the layout. Causes crash in newer
-  cartopy versions - position is already determined in any case.
+- The x-axis label of the bottom-left plot was cropped off the bottom of the
+  figure. The layout was tightened once per subplot as each was created, so
+  the bottom row was sized before it had its axis label and rotated tick
+  labels, leaving no room for them. The grid is now tightened a single time,
+  after every plot's labels are in place.
+- For the GGLON/GGLAT map, tighten the layout before adding it rather than
+  skipping the tighten. Its labelled gridlines report an infinite tight
+  bounding box, so with the map in the figure newer cartopy versions make
+  tight_layout return NaN positions for every subplot and the draw then
+  crashes. The map occupies a fixed grid cell, so tightening without it
+  leaves its position unchanged.
 - Combine step failed with `No such filter: ''` due to a space in the ffmpeg
   `-filter_complex hstack,format=yuv420p` argument under `shell=True`.
 - Plotting broke the generic "var1 vs var2" case after the CAESAR special case
