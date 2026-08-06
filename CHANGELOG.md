@@ -76,6 +76,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tight_layout return NaN positions for every subplot and the draw then
   crashes. The map occupies a fixed grid cell, so tightening without it
   leaves its position unchanged.
+- `test_timeseries_animation.py`'s stand-in for `setup_flight_vars` still had
+  its old two-argument signature, so all four flight-selection tests errored
+  out. It now takes `cfg` as well and returns a `FlightContext`, so the tests
+  follow main() through to plotting each flight.
 - Combine step failed with `No such filter: ''` due to a space in the ffmpeg
   `-filter_complex hstack,format=yuv420p` argument under `shell=True`.
 - Plotting broke the generic "var1 vs var2" case after the CAESAR special case

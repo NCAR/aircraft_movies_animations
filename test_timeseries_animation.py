@@ -22,7 +22,7 @@ from unittest import mock
 
 try:
     import timeseries_animation
-    from timeseries_animation import RunContext
+    from timeseries_animation import FlightContext, RunContext
     HAVE_DEPS = True
     _IMPORT_ERR = None
 except Exception as exc:          # pragma: no cover - depends on env
@@ -56,6 +56,16 @@ class FlightArgTests(unittest.TestCase):
 class FlightSelectionTests(unittest.TestCase):
     """Which flights main() loops over, given --flight or not."""
 
+    def record_flight(self, flight, run, cfg):
+        '''Stand in for setup_flight_vars: note which flight main() handed
+        over, without opening the flight's data file. It takes cfg as well as
+        the flight and run because it validates the config's VARLIST against
+        the data file. Returns a FlightContext so main() goes on to plot the
+        flight instead of taking its "no data file for this flight" path.'''
+        self.processed.append(flight)
+        return FlightContext(flight_data='/dat/TEST%s.nc' % flight,
+                             save_file='/out/TEST%sanimation.mp4' % flight)
+
     def setUp(self):
         self.processed = []
         self.cfg = types.SimpleNamespace(flights=["rf01", "rf02", "rf03"])
@@ -74,7 +84,7 @@ class FlightSelectionTests(unittest.TestCase):
             # Record each flight main() hands off, and skip opening data files.
             mock.patch.object(
                 timeseries_animation, "setup_flight_vars",
-                side_effect=lambda flight, run: self.processed.append(flight)),
+                side_effect=self.record_flight),
             mock.patch.object(timeseries_animation.animate, "plot"),
             mock.patch("builtins.print"),
         ]
